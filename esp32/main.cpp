@@ -12,7 +12,7 @@ namespace {
 
 // Delai max sans trame manette avant de considerer le lien perdu.
 constexpr int BLUEPAD_TIMEOUT_MS = 500;
-// Strategie de securite: si la radio tombe, recentrer toutes les pattes.
+// Strategie de securite: si la radio tombe, passer la FSM en Idle.
 constexpr bool RF_LOST_AUTO_CENTER = true;
 
 long long nowMs() {
@@ -58,8 +58,8 @@ int main() {
             inputManager.processBluepadInput(*gamepadData);
         } else if (currentTime - gamepadLastActive > BLUEPAD_TIMEOUT_MS) {
             if (inputManager.isGamepadConnected() && RF_LOST_AUTO_CENTER) {
-                std::cout << "[BLUEPAD] Signal perdu, recentrage" << std::endl;
-                servoController.centerAll();
+                std::cout << "[BLUEPAD] Signal perdu, passage en Idle" << std::endl;
+                inputManager.notifyGamepadDisconnected();
             }
         }
 
@@ -69,8 +69,9 @@ int main() {
 
         // 3) Telemetrie periodique pour debug serie.
         if (iteration % 100 == 0) {
-            std::cout << "[STATUS] boucle=" << iteration << " bluepad="
-                      << (bluepad.isConnected() ? "CONNECTE" : "DECONNECTE") << std::endl;
+            std::cout << "[STATUS] boucle=" << iteration
+                      << " bluepad=" << (inputManager.isGamepadConnected() ? "CONNECTE" : "DECONNECTE")
+                      << " fsm=" << inputManager.getLocomotionStateName() << std::endl;
         }
 
         // 4) Boucle de controle a 50 Hz.

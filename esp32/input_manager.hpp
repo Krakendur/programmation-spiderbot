@@ -2,6 +2,7 @@
 
 #include "bluepad_manager.hpp"
 #include "leg_kinematics.hpp"
+#include "locomotion_fsm.hpp"
 
 #include <array>
 #include <string>
@@ -28,8 +29,15 @@ public:
     // Reinitialise les consignes en position neutre.
     void reset();
 
+    // Signale une perte de connexion manette (timeout radio, etc.).
+    void notifyGamepadDisconnected();
+
     // Indique si une manette a deja fourni un etat valide.
     bool isGamepadConnected() const;
+
+    // Etat courant de la FSM locomotion.
+    LocomotionState getLocomotionState() const;
+    const char* getLocomotionStateName() const;
 
 private:
     // Horloge monotone en millisecondes pour la phase de marche.
@@ -49,6 +57,9 @@ private:
 
     // Moteur de cinematique inverse des pattes.
     LegKinematics kinematics_;
+
+    // Machine d'etats locomotion.
+    LocomotionFsm locomotionFsm_;
 };
 
 }  // namespace spiderbot
