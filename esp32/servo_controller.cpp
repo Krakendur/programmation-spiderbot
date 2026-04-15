@@ -5,7 +5,10 @@
 
 namespace spiderbot {
 
-ServoController::ServoController(const std::vector<int>& servoPins) : servoPins_(servoPins) {
+ServoController::ServoController(const std::vector<int>& servoPins)
+        : servoPins_(servoPins),
+            faultInjectionEnabled_(false),
+            failingServoId_(-1) {
     // La position courante est conservee meme en mode simulation,
     // ce qui permet de tester la logique sans pilote PWM reel.
     currentPositions_.fill(90);
@@ -14,6 +17,10 @@ ServoController::ServoController(const std::vector<int>& servoPins) : servoPins_
 
 bool ServoController::setServoPosition(int servoId, int angle) {
     if (servoId < 0 || servoId >= NUM_SERVOS) {
+        return false;
+    }
+
+    if (faultInjectionEnabled_ && (failingServoId_ < 0 || servoId == failingServoId_)) {
         return false;
     }
 
@@ -50,6 +57,15 @@ void ServoController::stopAll() {
     // - couper les canaux PWM
     // - ou forcer une position de securite
     std::cout << "[SERVO] Arret PWM" << std::endl;
+}
+
+void ServoController::setFaultInjection(bool enabled, int failingServoId) {
+    faultInjectionEnabled_ = enabled;
+    failingServoId_ = failingServoId;
+}
+
+bool ServoController::isFaultInjectionEnabled() const {
+    return faultInjectionEnabled_;
 }
 
 }  // namespace spiderbot

@@ -13,6 +13,9 @@ BluePadManager::BluePadManager() : connected_(false) {
 std::optional<GamepadData> BluePadManager::update() {
     // Stub: brancher ici la librairie manette cible (ESP-IDF, Bluepad32 C++, etc.).
     // Le contrat attendu est un GamepadData normalise (axes [-1..1], boutons booleens).
+    // En mode stub, on publie explicitement l'absence de signal.
+    connected_ = false;
+    gamepadData_.reset();
     return std::nullopt;
 }
 

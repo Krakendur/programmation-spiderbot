@@ -2,10 +2,11 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 
 namespace spiderbot {
 
-InputManager::InputManager() : gamepadConnected_(false) {
+InputManager::InputManager() : gamepadConnected_(false), ikTargetError_(false) {
     // Etat neutre: tous les servos au milieu.
     movementState_.fill(90);
 
@@ -25,11 +26,20 @@ bool InputManager::processBluepadInput(const GamepadData& gamepadData) {
     // Memorise le dernier etat valide de la manette.
     gamepadState_ = gamepadData;
     gamepadConnected_ = true;
-    computeServoPositionsFromGamepad();
+    computeServoPositionsFromGamepad(false, true);
     return true;
 }
 
-void InputManager::computeServoPositionsFromGamepad() {
+bool InputManager::processBluepadInputWithTripod(const GamepadData& gamepadData,
+                                                 bool tripodEnabled) {
+    gamepadState_ = gamepadData;
+    gamepadConnected_ = true;
+    computeServoPositionsFromGamepad(tripodEnabled, false);
+    return true;
+}
+
+void InputManager::computeServoPositionsFromGamepad(bool forceTripodEnabled,
+                                                    bool useAutoTripodSelection) {
     // Acces securise aux axes/boutons: fallback neutre si cle absente.
     const auto getAxis = [&](const std::string& name) {
         const auto it = gamepadState_.axes.find(name);
@@ -60,17 +70,24 @@ void InputManager::computeServoPositionsFromGamepad() {
     // Raccourci operateur: recentrage instantane en posture neutre.
     if (getButton("X")) {
         movementState_.fill(90);
+        ikTargetError_ = false;
         return;
     }
 
     // En dessous du seuil, on garde une posture statique stable.
     // Au dessus, on active la marche tripod cadencee par le temps.
     const double activity = std::abs(forward) + std::abs(lateral) + std::abs(yaw);
-    if (activity > 0.12) {
-        movementState_ =
-            kinematics_.computeTripodServoAngles(forward, lateral, yaw, height, nowMs(), lift);
+    const bool tripodEnabled =
+        useAutoTripodSelection ? (activity > 0.12) : forceTripodEnabled;
+    if (tripodEnabled) {
+        const auto ik =
+            kinematics_.computeTripodServoAnglesWithStatus(forward, lateral, yaw, height, nowMs(), lift);
+        movementState_ = ik.angles;
+        ikTargetError_ = ik.hadUnreachableTarget;
     } else {
-        movementState_ = kinematics_.computeServoAngles(forward, lateral, yaw, height, lift);
+        const auto ik = kinematics_.computeServoAnglesWithStatus(forward, lateral, yaw, height, lift);
+        movementState_ = ik.angles;
+        ikTargetError_ = ik.hadUnreachableTarget;
     }
 }
 
@@ -90,10 +107,15 @@ std::array<int, 18> InputManager::getServoCommands() const {
 
 void InputManager::reset() {
     movementState_.fill(90);
+    ikTargetError_ = false;
 }
 
 bool InputManager::isGamepadConnected() const {
     return gamepadConnected_;
+}
+
+bool InputManager::hasIkTargetError() const {
+    return ikTargetError_;
 }
 
 }  // namespace spiderbot

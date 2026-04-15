@@ -1,0 +1,41 @@
+@startuml
+title Spider-Bot - FSM locomotion tripod
+
+[*] --> TRIPOD_A_SUPPORT
+
+state TRIPOD_A_SUPPORT
+TRIPOD_A_SUPPORT : Tripode A en appui
+TRIPOD_A_SUPPORT : Tripode B en transfert
+TRIPOD_A_SUPPORT : Propulsion du robot
+
+state TRIPOD_B_SUPPORT
+TRIPOD_B_SUPPORT : Tripode B en appui
+TRIPOD_B_SUPPORT : Tripode A en transfert
+TRIPOD_B_SUPPORT : Propulsion du robot
+
+state WALK_PAUSE
+WALK_PAUSE : Fin progressive du cycle
+WALK_PAUSE : Stabilisation posture
+
+state WALK_ERROR
+WALK_ERROR : Erreur de locomotion
+WALK_ERROR : Désynchronisation
+WALK_ERROR : Phase invalide
+
+TRIPOD_A_SUPPORT --> TRIPOD_B_SUPPORT : demi-cycle écoulé\net signal OK
+TRIPOD_B_SUPPORT --> TRIPOD_A_SUPPORT : demi-cycle écoulé\net signal OK
+
+TRIPOD_A_SUPPORT --> WALK_PAUSE : arrêt demandé
+TRIPOD_A_SUPPORT --> WALK_PAUSE : activité <= seuil
+TRIPOD_B_SUPPORT --> WALK_PAUSE : arrêt demandé
+TRIPOD_B_SUPPORT --> WALK_PAUSE : activité <= seuil
+
+TRIPOD_A_SUPPORT --> WALK_ERROR : défaut de synchronisation
+TRIPOD_A_SUPPORT --> WALK_ERROR : phase invalide
+TRIPOD_B_SUPPORT --> WALK_ERROR : défaut de synchronisation
+TRIPOD_B_SUPPORT --> WALK_ERROR : phase invalide
+
+WALK_PAUSE --> [*] : sortie de marche OK
+WALK_ERROR --> [*] : locomotion interrompue
+
+@enduml

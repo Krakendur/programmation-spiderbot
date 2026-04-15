@@ -73,10 +73,32 @@ Il n'y a pas de communication fonctionnelle ESP32 <-> Raspberry Pi dans cette ve
 
 ## Architecture Logicielle ESP32
 
+### Hierarchie FSM et orchestration
+
+```text
+RobotController
+├── BluePadManager
+├── InputManager
+├── RobotFSM (globale)
+│   ├── TripodWalkFSM (locomotion)
+│   │   ├── LegFSM x6 (une par patte)
+├── LegKinematics (IK)
+└── ServoController (sortie servo finale)
+```
+
+- La FSM globale supervise le mode: Idle, Teleop, SafeStop, Error.
+- TripodWalkFSM pilote l'activation de la marche et les phases des 6 pattes.
+- LegKinematics reste le moteur mathematique central de l'IK.
+- ServoController conserve la conversion finale vers les 18 sorties servo.
+
 ### Modules
 
 | Module | Role |
 |--------|------|
+| robot_controller.cpp/.hpp | Orchestration globale de la boucle 50Hz |
+| robot_fsm.cpp/.hpp | Supervision des modes et transitions de securite |
+| tripod_walk_fsm.cpp/.hpp | Supervision locomotion tripod |
+| leg_fsm.cpp/.hpp | FSM legere Support/Transfer par patte |
 | servo_controller.cpp/.hpp | Gestion PWM 18 servos (50Hz) |
 | input_manager.cpp/.hpp | Traitement entrees manette + mapping cinematique |
 | bluepad_manager.cpp/.hpp | Interface manette Bluepad |
@@ -105,6 +127,14 @@ MANETTE BLUEPAD32
 
 1. Manette Bluepad32 (principale si connectee)
 2. Position neutre (timeout auto 500ms)
+
+### Garde-fous de securite
+
+- Timeout manette: 500 ms, centralise dans RobotController.
+- Signal perdu: passage en SafeStop et recentrage.
+- Defaut servo: detection sur echec d'ecriture des positions.
+- Cible IK impossible: remontee d'erreur vers RobotFSM.
+- Erreur critique: recentrage, stop PWM et sortie securisee.
 
 ---
 

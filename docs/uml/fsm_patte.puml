@@ -1,0 +1,54 @@
+@startuml
+title Spider-Bot - FSM d'une patte
+
+[*] --> SUPPORT
+
+state SUPPORT
+SUPPORT : Pied au sol
+SUPPORT : Patte en appui
+SUPPORT : Propulsion / stabilité
+
+state LIFT
+LIFT : Levée de la patte
+LIFT : Augmentation de z
+
+state SWING
+SWING : Patte en l'air
+SWING : Déplacement vers l'avant
+SWING : Mise à jour de x et y
+
+state PLACE
+PLACE : Descente de la patte
+PLACE : Réduction progressive de z
+
+state CONTACT_CHECK
+CONTACT_CHECK : Vérification du contact
+CONTACT_CHECK : Touché / pas touché
+
+state LEG_ERROR
+LEG_ERROR : Erreur locale patte
+LEG_ERROR : Transition invalide
+LEG_ERROR : Défaut servo ou IK
+
+SUPPORT --> LIFT : fin phase appui\net autre tripode stable
+
+LIFT --> SWING : hauteur cible atteinte
+LIFT --> LEG_ERROR : timeout levée
+LIFT --> LEG_ERROR : défaut servo
+
+SWING --> PLACE : position cible atteinte
+SWING --> LEG_ERROR : cible IK impossible
+SWING --> LEG_ERROR : timeout swing
+
+PLACE --> CONTACT_CHECK : pied proche du sol
+PLACE --> LEG_ERROR : timeout pose
+PLACE --> LEG_ERROR : défaut servo
+
+CONTACT_CHECK --> SUPPORT : contact sol estimé
+CONTACT_CHECK --> SUPPORT : temporisation contact OK
+CONTACT_CHECK --> LIFT : pas de contact\net nouvelle tentative autorisée
+CONTACT_CHECK --> LEG_ERROR : pas de contact\net nombre max de tentatives atteint
+
+LEG_ERROR --> [*] : patte arrêtée
+
+@enduml

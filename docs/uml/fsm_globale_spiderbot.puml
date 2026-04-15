@@ -1,0 +1,76 @@
+@startuml
+title Spider-Bot - FSM globale
+
+[*] --> INIT
+
+state INIT
+INIT : Initialisation des modules
+INIT : Initialisation des servos
+INIT : Vérification système
+
+state CENTERING
+CENTERING : Retour en position neutre
+CENTERING : Servos à 90°
+CENTERING : Validation posture sûre
+
+state IDLE
+IDLE : Robot au repos
+IDLE : Attente de commande
+IDLE : Aucun mouvement demandé
+
+state STATIC_POSTURE
+STATIC_POSTURE : Maintien de posture
+STATIC_POSTURE : Ajustement hauteur/orientation
+STATIC_POSTURE : Robot immobile
+
+state TRIPOD_WALK
+TRIPOD_WALK : Marche hexapode
+TRIPOD_WALK : Coordination tripod
+TRIPOD_WALK : Mouvement cyclique
+
+state SAFE_STOP
+SAFE_STOP : Arrêt sécurisé
+SAFE_STOP : Fin des mouvements
+SAFE_STOP : Maintien posture sûre
+
+state ERROR
+ERROR : Etat erreur
+ERROR : Mouvement inhibé
+ERROR : Diagnostic nécessaire
+
+INIT --> CENTERING : initialisation OK
+INIT --> ERROR : échec initialisation
+
+CENTERING --> IDLE : centrage terminé
+CENTERING --> ERROR : défaut servo
+CENTERING --> ERROR : timeout centrage
+
+IDLE --> STATIC_POSTURE : commande posture
+IDLE --> TRIPOD_WALK : commande marche + signal OK
+IDLE --> SAFE_STOP : perte signal
+IDLE --> ERROR : défaut critique
+
+STATIC_POSTURE --> IDLE : aucune commande posture\net joysticks au neutre
+STATIC_POSTURE --> TRIPOD_WALK : commande marche\net activité > seuil
+STATIC_POSTURE --> SAFE_STOP : perte signal
+STATIC_POSTURE --> ERROR : cible IK impossible
+STATIC_POSTURE --> ERROR : défaut servo
+STATIC_POSTURE --> ERROR : défaut critique
+
+TRIPOD_WALK --> IDLE : arrêt demandé\net activité faible
+TRIPOD_WALK --> STATIC_POSTURE : commande posture
+TRIPOD_WALK --> SAFE_STOP : perte signal
+TRIPOD_WALK --> SAFE_STOP : arrêt d'urgence
+TRIPOD_WALK --> ERROR : cible IK impossible
+TRIPOD_WALK --> ERROR : défaut servo
+TRIPOD_WALK --> ERROR : défaut watchdog
+
+SAFE_STOP --> CENTERING : réarmement\net signal revenu
+SAFE_STOP --> ERROR : arrêt impossible
+SAFE_STOP --> ERROR : défaut persistant
+
+ERROR --> SAFE_STOP : erreur récupérable\net acquittement
+ERROR --> CENTERING : reset logiciel\net défaut disparu
+ERROR --> [*] : arrêt système
+
+@enduml

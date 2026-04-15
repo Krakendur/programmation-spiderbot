@@ -67,7 +67,10 @@ double LegKinematics::transferCurve(double u) {
     return -1.0 + 2.0 * u;
 }
 
-std::array<double, 3> LegKinematics::solveLegIk(double x, double y, double z) const {
+std::array<double, 3> LegKinematics::solveLegIk(double x,
+                                                double y,
+                                                double z,
+                                                bool* unreachableTarget) const {
     // Etape 1: orientation horizontale (coxa).
     const double coxaDeg = std::atan2(y, x) * 180.0 / kPi;
 
@@ -81,6 +84,9 @@ std::array<double, 3> LegKinematics::solveLegIk(double x, double y, double z) co
     double d = std::sqrt(horizontal * horizontal + z * z);
     const double maxReach = femurLen_ + tibiaLen_ - 1e-6;
     const double minReach = std::abs(femurLen_ - tibiaLen_) + 1e-6;
+    if (unreachableTarget != nullptr) {
+        *unreachableTarget = (d < minReach || d > maxReach);
+    }
     d = clamp(d, minReach, maxReach);
 
     const double alpha = std::atan2(z, horizontal);
@@ -119,11 +125,11 @@ std::array<int, 3> LegKinematics::jointToServo(int legId,
     return result;
 }
 
-std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeServoAngles(double forward,
-                                                                              double lateral,
-                                                                              double yaw,
-                                                                              double height,
-                                                                              double lift) const {
+LegKinematics::IkComputationResult LegKinematics::computeServoAnglesWithStatus(double forward,
+                                                                                double lateral,
+                                                                                double yaw,
+                                                                                double height,
+                                                                                double lift) const {
     // Mode statique: applique une pose corps sans cycle de marche.
     const double maxXYShift = 30.0;
     const double maxYawRad = 18.0 * kPi / 180.0;
@@ -136,8 +142,9 @@ std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeServoAngles(dou
     const double dz = clamp(height, -1.0, 1.0) * maxHeightShift;
     const double dzLift = clamp(lift, 0.0, 1.0) * maxLift;
 
-    std::array<int, NUM_SERVOS> out{};
-    out.fill(90);
+    IkComputationResult result{};
+    result.angles.fill(90);
+    result.hadUnreachableTarget = false;
 
     for (int legId = 0; legId < NUM_LEGS; ++legId) {
         const double baseX = legAnchors_[legId][0];
@@ -153,24 +160,34 @@ std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeServoAngles(dou
         const double ty = nfy - dy - yawDy;
         const double tz = nfz - dz + dzLift;
 
-        const auto joint = solveLegIk(tx, ty, tz);
+        bool legUnreachable = false;
+        const auto joint = solveLegIk(tx, ty, tz, &legUnreachable);
+        result.hadUnreachableTarget = result.hadUnreachableTarget || legUnreachable;
         const auto servo = jointToServo(legId, joint[0], joint[1], joint[2]);
 
         const int i = legId * SERVOS_PER_LEG;
-        out[i] = servo[0];
-        out[i + 1] = servo[1];
-        out[i + 2] = servo[2];
+        result.angles[i] = servo[0];
+        result.angles[i + 1] = servo[1];
+        result.angles[i + 2] = servo[2];
     }
 
-    return out;
+    return result;
 }
 
-std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeTripodServoAngles(double forward,
-                                                                                    double lateral,
-                                                                                    double yaw,
-                                                                                    double height,
-                                                                                    long long timeMs,
-                                                                                    double lift) const {
+std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeServoAngles(double forward,
+                                                                              double lateral,
+                                                                              double yaw,
+                                                                              double height,
+                                                                              double lift) const {
+    return computeServoAnglesWithStatus(forward, lateral, yaw, height, lift).angles;
+}
+
+LegKinematics::IkComputationResult LegKinematics::computeTripodServoAnglesWithStatus(double forward,
+                                                                                       double lateral,
+                                                                                       double yaw,
+                                                                                       double height,
+                                                                                       long long timeMs,
+                                                                                       double lift) const {
     // Mode marche tripod: deux groupes de pattes en opposition de phase.
     const int cycleMs = 700;
     const double stepSpan = 38.0;
@@ -185,8 +202,9 @@ std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeTripodServoAngl
     const double extraLift = clamp(lift, 0.0, 1.0) * 14.0;
 
     const double basePh = phase(timeMs, cycleMs);
-    std::array<int, NUM_SERVOS> out{};
-    out.fill(90);
+    IkComputationResult result{};
+    result.angles.fill(90);
+    result.hadUnreachableTarget = false;
 
     for (int legId = 0; legId < NUM_LEGS; ++legId) {
         // Tripod B = FR, ML, RR. Les autres pattes appartiennent au tripod A.
@@ -222,16 +240,27 @@ std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeTripodServoAngl
         const double ty = nfy + phaseGain * (lat * stepSpan + yawDy);
         const double tz = nfz - (h * maxHeightShift) + swingZ + extraLift;
 
-        const auto joint = solveLegIk(tx, ty, tz);
+        bool legUnreachable = false;
+        const auto joint = solveLegIk(tx, ty, tz, &legUnreachable);
+        result.hadUnreachableTarget = result.hadUnreachableTarget || legUnreachable;
         const auto servo = jointToServo(legId, joint[0], joint[1], joint[2]);
 
         const int i = legId * SERVOS_PER_LEG;
-        out[i] = servo[0];
-        out[i + 1] = servo[1];
-        out[i + 2] = servo[2];
+        result.angles[i] = servo[0];
+        result.angles[i + 1] = servo[1];
+        result.angles[i + 2] = servo[2];
     }
 
-    return out;
+    return result;
+}
+
+std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeTripodServoAngles(double forward,
+                                                                                    double lateral,
+                                                                                    double yaw,
+                                                                                    double height,
+                                                                                    long long timeMs,
+                                                                                    double lift) const {
+    return computeTripodServoAnglesWithStatus(forward, lateral, yaw, height, timeMs, lift).angles;
 }
 
 }  // namespace spiderbot
