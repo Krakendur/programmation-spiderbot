@@ -141,6 +141,9 @@ std::array<double, 3> LegKinematics::solveLegIk(double x, double y, double z) co
     double d = std::sqrt(horizontal * horizontal + z * z);
     const double maxReach = femurLen_ + tibiaLen_ - 1e-6;
     const double minReach = std::abs(femurLen_ - tibiaLen_) + 1e-6;
+    if (unreachableTarget != nullptr) {
+        *unreachableTarget = (d < minReach || d > maxReach);
+    }
     d = clamp(d, minReach, maxReach);
 
     // alpha: inclinaison de la cible dans le plan femur/tibia.
@@ -197,11 +200,11 @@ std::array<int, 3> LegKinematics::jointToServo(int legId,
     return result;
 }
 
-std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeServoAngles(double forward,
-                                                                              double lateral,
-                                                                              double yaw,
-                                                                              double height,
-                                                                              double lift) const {
+LegKinematics::IkComputationResult LegKinematics::computeServoAnglesWithStatus(double forward,
+                                                                                double lateral,
+                                                                                double yaw,
+                                                                                double height,
+                                                                                double lift) const {
     // Mode statique: applique une pose corps sans cycle de marche.
     // Ces gains convertissent des commandes normalisees en deplacements mm/rad.
     const double maxXYShift = 30.0;
@@ -215,8 +218,9 @@ std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeServoAngles(dou
     const double dz = clamp(height, -1.0, 1.0) * maxHeightShift;
     const double dzLift = clamp(lift, 0.0, 1.0) * maxLift;
 
-    std::array<int, NUM_SERVOS> out{};
-    out.fill(90);
+    IkComputationResult result{};
+    result.angles.fill(90);
+    result.hadUnreachableTarget = false;
 
     // Chaque patte est calculee independamment, puis mappee vers 3 servos.
     for (int legId = 0; legId < NUM_LEGS; ++legId) {
@@ -240,20 +244,28 @@ std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeServoAngles(dou
         const auto servo = jointToServo(legId, joint[0], joint[1], joint[2]);
 
         const int i = legId * SERVOS_PER_LEG;
-        out[i] = servo[0];
-        out[i + 1] = servo[1];
-        out[i + 2] = servo[2];
+        result.angles[i] = servo[0];
+        result.angles[i + 1] = servo[1];
+        result.angles[i + 2] = servo[2];
     }
 
-    return out;
+    return result;
 }
 
-std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeTripodServoAngles(double forward,
-                                                                                    double lateral,
-                                                                                    double yaw,
-                                                                                    double height,
-                                                                                    long long timeMs,
-                                                                                    double lift) const {
+std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeServoAngles(double forward,
+                                                                              double lateral,
+                                                                              double yaw,
+                                                                              double height,
+                                                                              double lift) const {
+    return computeServoAnglesWithStatus(forward, lateral, yaw, height, lift).angles;
+}
+
+LegKinematics::IkComputationResult LegKinematics::computeTripodServoAnglesWithStatus(double forward,
+                                                                                       double lateral,
+                                                                                       double yaw,
+                                                                                       double height,
+                                                                                       long long timeMs,
+                                                                                       double lift) const {
     // Mode marche tripod: deux groupes de pattes en opposition de phase.
     // Les gains sont differents du mode statique pour favoriser un deplacement fluide.
     //
@@ -276,8 +288,9 @@ std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeTripodServoAngl
     // Phase globale du cycle [0,1).
     // 0.0 = debut cycle, 0.5 = inversion des tripodes.
     const double basePh = phase(timeMs, cycleMs);
-    std::array<int, NUM_SERVOS> out{};
-    out.fill(90);
+    IkComputationResult result{};
+    result.angles.fill(90);
+    result.hadUnreachableTarget = false;
 
     for (int legId = 0; legId < NUM_LEGS; ++legId) {
         // Tripod B = FR, ML, RR. Les autres pattes appartiennent au tripod A.
@@ -324,9 +337,9 @@ std::array<int, LegKinematics::NUM_SERVOS> LegKinematics::computeTripodServoAngl
         const auto servo = jointToServo(legId, joint[0], joint[1], joint[2]);
 
         const int i = legId * SERVOS_PER_LEG;
-        out[i] = servo[0];
-        out[i + 1] = servo[1];
-        out[i + 2] = servo[2];
+        result.angles[i] = servo[0];
+        result.angles[i + 1] = servo[1];
+        result.angles[i + 2] = servo[2];
     }
 
     // Tableau final de 18 angles pret a etre envoye a ServoController.

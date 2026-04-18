@@ -116,4 +116,13 @@ void ServoController::stopAll() {
     std::cout << "[SERVO] Arret PWM" << std::endl;
 }
 
+void ServoController::setFaultInjection(bool enabled, int failingServoId) {
+    faultInjectionEnabled_ = enabled;
+    failingServoId_ = failingServoId;
+}
+
+bool ServoController::isFaultInjectionEnabled() const {
+    return faultInjectionEnabled_;
+}
+
 }  // namespace spiderbot

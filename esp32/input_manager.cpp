@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 
 namespace spiderbot {
 
@@ -25,8 +26,7 @@ namespace spiderbot {
 // ============================================================
 
 InputManager::InputManager() : gamepadConnected_(false) {
-    // Etat de securite au demarrage:
-    // toutes les articulations a 90 degres (position neutre).
+    // Etat neutre: tous les servos au milieu.
     movementState_.fill(90);
 
     // Initialisation defensive: toutes les entrees de manette a zero.
@@ -51,11 +51,20 @@ bool InputManager::processBluepadInput(const GamepadData& gamepadData) {
     // les consignes servo pour garder une reponse fluide.
     gamepadState_ = gamepadData;
     gamepadConnected_ = true;
-    computeServoPositionsFromGamepad();
+    computeServoPositionsFromGamepad(false, true);
     return true;
 }
 
-void InputManager::computeServoPositionsFromGamepad() {
+bool InputManager::processBluepadInputWithTripod(const GamepadData& gamepadData,
+                                                 bool tripodEnabled) {
+    gamepadState_ = gamepadData;
+    gamepadConnected_ = true;
+    computeServoPositionsFromGamepad(tripodEnabled, false);
+    return true;
+}
+
+void InputManager::computeServoPositionsFromGamepad(bool forceTripodEnabled,
+                                                    bool useAutoTripodSelection) {
     // Acces securise aux axes/boutons: fallback neutre si cle absente.
     // Objectif: robustesse face a une trame incomplete ou un changement de mapping.
     // Les lambdas evitent les acces directs risques a une map potentiellement incomplète.
@@ -106,21 +115,21 @@ void InputManager::computeServoPositionsFromGamepad() {
     const double height = -ry;
     const double lift = std::clamp((rt - lt + 1.0) * 0.5, 0.0, 1.0);
 
-    // La production des commandes servos est deleguee a une FSM explicite.
-    // Etats utilises: Idle, Stand, Walk, Turn, EmergencyStop.
-    const LocomotionCommand command{
-        forward,
-        lateral,
-        yaw,
-        height,
-        lift,
-        getButton("X"),
-        getButton("B"),
-        gamepadConnected_,
-        nowMs(),
-    };
+    // Raccourci operateur: recentrage instantane en posture neutre.
+    if (getButton("X")) {
+        movementState_.fill(90);
+        return;
+    }
 
-    movementState_ = locomotionFsm_.update(command, kinematics_);
+    // En dessous du seuil, on garde une posture statique stable.
+    // Au dessus, on active la marche tripod cadencee par le temps.
+    const double activity = std::abs(forward) + std::abs(lateral) + std::abs(yaw);
+    if (activity > 0.12) {
+        movementState_ =
+            kinematics_.computeTripodServoAngles(forward, lateral, yaw, height, nowMs(), lift);
+    } else {
+        movementState_ = kinematics_.computeServoAngles(forward, lateral, yaw, height, lift);
+    }
 }
 
 bool InputManager::processUartCommand(const std::string& commandJson) {
@@ -145,38 +154,11 @@ std::array<int, 18> InputManager::getServoCommands() const {
 void InputManager::reset() {
     // Reset local du module (sans effet sur l etat de connexion RF).
     movementState_.fill(90);
-    locomotionFsm_.reset();
-}
-
-void InputManager::notifyGamepadDisconnected() {
-    gamepadConnected_ = false;
-
-    const LocomotionCommand command{
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        false,
-        false,
-        false,
-        nowMs(),
-    };
-
-    movementState_ = locomotionFsm_.update(command, kinematics_);
 }
 
 bool InputManager::isGamepadConnected() const {
     // Indique si au moins une trame manette valide a ete recue.
     return gamepadConnected_;
-}
-
-LocomotionState InputManager::getLocomotionState() const {
-    return locomotionFsm_.state();
-}
-
-const char* InputManager::getLocomotionStateName() const {
-    return locomotionFsm_.stateName();
 }
 
 }  // namespace spiderbot

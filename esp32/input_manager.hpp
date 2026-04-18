@@ -19,6 +19,10 @@ public:
     // Met a jour l'etat manette puis recalcule les angles servos.
     bool processBluepadInput(const GamepadData& gamepadData);
 
+    // Variante explicite pilotee par la FSM locomotion.
+    // Si tripodEnabled vaut false, la posture statique est forcee.
+    bool processBluepadInputWithTripod(const GamepadData& gamepadData, bool tripodEnabled);
+
     // Traite une commande serie au format JSON (ou pseudo-JSON).
     // Exemple supporte actuellement: center_all.
     bool processUartCommand(const std::string& commandJson);
@@ -44,7 +48,10 @@ private:
     static long long nowMs();
 
     // Applique le mapping axes/boutons -> commandes cinematiques.
-    void computeServoPositionsFromGamepad();
+    // - useAutoTripodSelection=true: choix tripod selon activite joystick.
+    // - useAutoTripodSelection=false: utilise forceTripodEnabled.
+    void computeServoPositionsFromGamepad(bool forceTripodEnabled,
+                                          bool useAutoTripodSelection);
 
     // Etat cible des 18 servos.
     std::array<int, 18> movementState_;
@@ -54,6 +61,9 @@ private:
 
     // Vrai si la manette a deja ete vue active.
     bool gamepadConnected_;
+
+    // Memorise un depassement IK sur le dernier calcul.
+    bool ikTargetError_;
 
     // Moteur de cinematique inverse des pattes.
     LegKinematics kinematics_;

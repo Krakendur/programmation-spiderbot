@@ -12,6 +12,11 @@ public:
     static constexpr int SERVOS_PER_LEG = 3;
     static constexpr int NUM_SERVOS = 18;
 
+    struct IkComputationResult {
+        std::array<int, NUM_SERVOS> angles;
+        bool hadUnreachableTarget;
+    };
+
     LegKinematics();
 
     // Mode statique: calcule une posture globale sans cycle de marche.
@@ -24,6 +29,12 @@ public:
                                                    double height,
                                                    double lift) const;
 
+    IkComputationResult computeServoAnglesWithStatus(double forward,
+                                                     double lateral,
+                                                     double yaw,
+                                                     double height,
+                                                     double lift) const;
+
     // Mode dynamique tripod.
     // timeMs sert a calculer la phase de cycle de marche.
     std::array<int, NUM_SERVOS> computeTripodServoAngles(double forward,
@@ -33,6 +44,13 @@ public:
                                                          long long timeMs,
                                                          double lift = 0.0) const;
 
+    IkComputationResult computeTripodServoAnglesWithStatus(double forward,
+                                                           double lateral,
+                                                           double yaw,
+                                                           double height,
+                                                           long long timeMs,
+                                                           double lift = 0.0) const;
+
 private:
     // Utilitaires numeriques.
     static double clamp(double value, double low, double high);
@@ -41,7 +59,7 @@ private:
     static double transferCurve(double u);
 
     // IK 3DDL locale pour une patte (repere patte, en mm).
-    std::array<double, 3> solveLegIk(double x, double y, double z) const;
+    std::array<double, 3> solveLegIk(double x, double y, double z, bool* unreachableTarget) const;
 
     // Conversion espace articulaire -> angles servo physiques (avec calibration).
     std::array<int, 3> jointToServo(int legId,

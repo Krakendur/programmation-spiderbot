@@ -1,0 +1,39 @@
+@startuml
+title Spider-Bot - FSM globale simplifiée
+
+[*] --> INIT
+
+state INIT
+state CENTERING
+state IDLE
+state STATIC_POSTURE
+state TRIPOD_WALK
+state SAFE_STOP
+state ERROR
+
+INIT --> CENTERING : initialisation OK
+INIT --> ERROR : échec initialisation
+
+CENTERING --> IDLE : centrage terminé
+CENTERING --> ERROR : défaut servo
+
+IDLE --> STATIC_POSTURE : commande posture
+IDLE --> TRIPOD_WALK : joystick actif
+IDLE --> SAFE_STOP : perte signal
+
+STATIC_POSTURE --> IDLE : aucune commande
+STATIC_POSTURE --> TRIPOD_WALK : activité > seuil
+STATIC_POSTURE --> SAFE_STOP : perte signal
+STATIC_POSTURE --> ERROR : défaut critique
+
+TRIPOD_WALK --> IDLE : arrêt demandé
+TRIPOD_WALK --> SAFE_STOP : perte signal
+TRIPOD_WALK --> ERROR : défaut critique
+
+SAFE_STOP --> CENTERING : réarmement
+SAFE_STOP --> ERROR : défaut persistant
+
+ERROR --> SAFE_STOP : erreur récupérable
+ERROR --> CENTERING : reset logiciel
+ERROR --> [*] : arrêt système
+@enduml

@@ -32,12 +32,23 @@ public:
     // Arret/relachement de la sortie PWM (selon implementation materielle).
     void stopAll();
 
+    // Active une faute de sortie servo pour tester la chaine de securite.
+    // failingServoId = -1 force l'echec de tous les servos.
+    void setFaultInjection(bool enabled, int failingServoId = -1);
+
+    // Indique si l'injection de faute est active.
+    bool isFaultInjectionEnabled() const;
+
 private:
     // Liste des GPIO associes aux 18 servos.
     std::vector<int> servoPins_;
 
     // Cache de l'etat courant en degres, utile en simulation et telemetrie.
     std::array<int, NUM_SERVOS> currentPositions_;
+
+    // Outils de test securite: simulation de defaut servo.
+    bool faultInjectionEnabled_;
+    int failingServoId_;
 };
 
 }  // namespace spiderbot

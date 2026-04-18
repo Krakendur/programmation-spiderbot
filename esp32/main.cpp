@@ -1,11 +1,7 @@
-#include "bluepad_manager.hpp"
-#include "input_manager.hpp"
-#include "servo_controller.hpp"
+#include "robot_controller.hpp"
 
-#include <array>
-#include <chrono>
 #include <iostream>
-#include <thread>
+#include <stdexcept>
 #include <vector>
 
 namespace {
@@ -29,8 +25,13 @@ std::vector<int> getServoPins() {
 
 int main() {
     const auto servoPins = getServoPins();
-    if (servoPins.size() != 18) {
-        std::cerr << "[ERREUR] Il faut exactement 18 GPIO pour les servos" << std::endl;
+    std::cout << "Spider-Bot ESP32 C++ - Initialization" << std::endl;
+
+    try {
+        spiderbot::RobotController controller(servoPins);
+        return controller.run();
+    } catch (const std::invalid_argument& e) {
+        std::cerr << "[ERROR] " << e.what() << std::endl;
         return 1;
     }
 

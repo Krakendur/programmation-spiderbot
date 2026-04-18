@@ -48,6 +48,14 @@ L’objectif du système de locomotion est de :
 programmation spiderbot/
 ├── esp32/
 │   ├── main.cpp
+│   ├── robot_controller.hpp
+│   ├── robot_controller.cpp
+│   ├── robot_fsm.hpp
+│   ├── robot_fsm.cpp
+│   ├── tripod_walk_fsm.hpp
+│   ├── tripod_walk_fsm.cpp
+│   ├── leg_fsm.hpp
+│   ├── leg_fsm.cpp
 │   ├── servo_controller.hpp
 │   ├── servo_controller.cpp
 │   ├── input_manager.hpp
@@ -67,6 +75,13 @@ programmation spiderbot/
 ├── common/
 │   ├── protocol.hpp
 │   └── protocol.cpp
+│
+├── docs/
+│   └── uml/
+│       ├── fsm_globale_spiderbot.puml
+│       ├── fsm_globale_simplifiee.puml
+│       ├── fsm_locomotion_tripod.puml
+│       └── fsm_patte.puml
 │
 ├── ARCHITECTURE.md
 └── README.md

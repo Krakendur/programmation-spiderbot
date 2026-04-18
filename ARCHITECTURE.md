@@ -68,26 +68,40 @@ Pipeline de locomotion:
 
 ---
 
-## Architecture logicielle ESP32
+## Architecture Logicielle ESP32
+
+### Modules
 
 | Module | Role |
 |--------|------|
-| main.cpp | Boucle principale du controle mouvement |
-| bluepad_manager.cpp/.hpp | Connexion et lecture manette |
-| input_manager.cpp/.hpp | Normalisation/mapping des commandes utilisateur |
-| leg_kinematics.cpp/.hpp | Cinematique inverse et generation de trajectoires |
-| servo_controller.cpp/.hpp | Pilotage PWM des 18 servomoteurs |
+| servo_controller.cpp/.hpp | Gestion PWM 18 servos (50Hz) |
+| input_manager.cpp/.hpp | Traitement entrees manette + mapping cinematique |
+| bluepad_manager.cpp/.hpp | Interface manette Bluepad |
+| leg_kinematics.cpp/.hpp | Cinematique inverse + demarche tripod |
+| main.cpp | Boucle principale ESP32 |
 
-Flux logique:
+### Flux de Donnees
 
-```text
-Manette
-    -> bluepad_manager
-    -> input_manager
-    -> leg_kinematics
-    -> servo_controller
-    -> Servomoteurs
 ```
+MANETTE BLUEPAD32
+    ↓ Bluetooth 2.4GHz
+    └─→ ESP32
+        ↓
+        Input Manager
+        ↓
+        Leg Kinematics
+        ↓
+        Servo Controller
+        ↓
+        PWM GPIO (18x)
+        ↓
+    SERVOMOTEURS MG996R
+```
+
+### Priorites d'Entree
+
+1. Manette Bluepad32 (principale si connectee)
+2. Position neutre (timeout auto 500ms)
 
 ---
 
