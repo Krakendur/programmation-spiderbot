@@ -28,6 +28,7 @@ RobotController::RobotController(const std::vector<int>& servoPins)
             gamepadLastActiveMs_(spiderbot::nowMs()),
       iteration_(0),
       safeStopApplied_(false),
+    lastLoggedMode_(RobotMode::Idle),
       tickCallback_() {
     if (servoPins.size() != ServoController::NUM_SERVOS) {
         throw std::invalid_argument("RobotController requires exactly 18 servo pins");
@@ -97,7 +98,18 @@ int RobotController::run() {
         fsmInput.ikError = inputManager_.hasIkTargetError();
         robotFsm_.update(fsmInput);
 
-        switch (robotFsm_.mode()) {
+        const RobotMode currentMode = robotFsm_.mode();
+        if (currentMode != lastLoggedMode_) {
+            std::cout << "[FSM] mode=" << modeToString(currentMode)
+                      << " frame=" << (frameReceived ? "yes" : "no")
+                      << " seen=" << (gamepadSeen ? "yes" : "no")
+                      << " lost=" << (signalLost ? "yes" : "no")
+                      << " ik=" << (fsmInput.ikError ? "yes" : "no")
+                      << std::endl;
+            lastLoggedMode_ = currentMode;
+        }
+
+        switch (currentMode) {
             case RobotMode::Teleop: {
                 const auto commands = inputManager_.getServoCommands();
                 if (!servoController_.setAllPositions(commands)) {
@@ -131,7 +143,7 @@ int RobotController::run() {
         if (iteration_ % 100 == 0) {
             std::cout << "[STATUS] loop=" << iteration_ << " bluepad="
                       << (bluepad_.isConnected() ? "CONNECTED" : "DISCONNECTED")
-                      << " mode=" << modeToString(robotFsm_.mode()) << std::endl;
+                      << " mode=" << modeToString(currentMode) << std::endl;
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(20));

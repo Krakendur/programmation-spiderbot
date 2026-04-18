@@ -1,6 +1,7 @@
 #include "esp32_runtime_wiring.hpp"
 
 #include <cmath>
+#include <cstring>
 #include <iostream>
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(SPIDERBOT_USE_LEDC_EXAMPLE)
@@ -54,6 +55,25 @@ GamepadData buildSimulationFrame(int step) {
     }
 
     return data;
+}
+
+const char* simulationPhaseLabel(int step) {
+    if (step < 20) {
+        return "REST";
+    }
+    if (step < 60) {
+        return "FORWARD";
+    }
+    if (step < 90) {
+        return "TURN";
+    }
+    if (step < 110) {
+        return "CENTER";
+    }
+    if (step < 140) {
+        return "WALK_LIGHT";
+    }
+    return "REST";
 }
 
 const char* validationServoLabel(int servoId) {
@@ -160,6 +180,12 @@ void configureEsp32RuntimeWiring(RobotController& controller,
     std::cout << "[ESP32] Bluepad32 backend disabled (simulation input)" << std::endl;
     controller.setTickCallback([&controller]() {
         static int simulationStep = 0;
+        static const char* lastPhase = nullptr;
+        const char* phase = simulationPhaseLabel(simulationStep);
+        if (lastPhase == nullptr || std::strcmp(phase, lastPhase) != 0) {
+            std::cout << "[SIM] phase=" << phase << " step=" << simulationStep << std::endl;
+            lastPhase = phase;
+        }
         controller.bluepadManager().publishFrame(buildSimulationFrame(simulationStep));
         ++simulationStep;
     });

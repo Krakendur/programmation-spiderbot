@@ -38,6 +38,7 @@ private:
     long long gamepadLastActiveMs_;
     int iteration_;
     bool safeStopApplied_;
+    RobotMode lastLoggedMode_;
     std::function<void()> tickCallback_;
 };
 
