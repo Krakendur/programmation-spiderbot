@@ -5,7 +5,7 @@
 
 namespace spiderbot {
 
-LocomotionFsm::LocomotionFsm() : state_(LocomotionState::Idle) {}
+LocomotionFsm::LocomotionFsm() : state_(LocomotionState::Idle), hadIkTargetError_(false) {}
 
 double LocomotionFsm::absSum(double a, double b, double c) {
     return std::abs(a) + std::abs(b) + std::abs(c);
@@ -30,6 +30,8 @@ const char* LocomotionFsm::toString(LocomotionState state) {
 
 std::array<int, LegKinematics::NUM_SERVOS> LocomotionFsm::update(const LocomotionCommand& command,
                                                                   const LegKinematics& kinematics) {
+    hadIkTargetError_ = false;
+
     const double clampedForward = std::clamp(command.forward, -1.0, 1.0);
     const double clampedLateral = std::clamp(command.lateral, -1.0, 1.0);
     const double clampedYaw = std::clamp(command.yaw, -1.0, 1.0);
@@ -41,6 +43,8 @@ std::array<int, LegKinematics::NUM_SERVOS> LocomotionFsm::update(const Locomotio
     } else if (!command.gamepadConnected) {
         state_ = LocomotionState::Idle;
     } else if (command.centerRequested) {
+        state_ = LocomotionState::Stand;
+    } else if (!command.tripodEnabled) {
         state_ = LocomotionState::Stand;
     } else {
         const double moveActivity = absSum(clampedForward, clampedLateral, 0.0);
@@ -63,24 +67,29 @@ std::array<int, LegKinematics::NUM_SERVOS> LocomotionFsm::update(const Locomotio
     }
 
     if (state_ == LocomotionState::Turn) {
-        return kinematics.computeTripodServoAngles(0.0,
-                                                   0.0,
-                                                   clampedYaw,
-                                                   clampedHeight,
-                                                   command.nowMs,
-                                                   clampedLift);
+        const auto result = kinematics.computeTripodServoAnglesWithStatus(0.0,
+                                                                          0.0,
+                                                                          clampedYaw,
+                                                                          clampedHeight,
+                                                                          command.nowMs,
+                                                                          clampedLift);
+        hadIkTargetError_ = result.hadUnreachableTarget;
+        return result.angles;
     }
 
-    return kinematics.computeTripodServoAngles(clampedForward,
-                                               clampedLateral,
-                                               clampedYaw,
-                                               clampedHeight,
-                                               command.nowMs,
-                                               clampedLift);
+    const auto result = kinematics.computeTripodServoAnglesWithStatus(clampedForward,
+                                                                      clampedLateral,
+                                                                      clampedYaw,
+                                                                      clampedHeight,
+                                                                      command.nowMs,
+                                                                      clampedLift);
+    hadIkTargetError_ = result.hadUnreachableTarget;
+    return result.angles;
 }
 
 void LocomotionFsm::reset() {
     state_ = LocomotionState::Idle;
+    hadIkTargetError_ = false;
 }
 
 LocomotionState LocomotionFsm::state() const {
@@ -89,6 +98,10 @@ LocomotionState LocomotionFsm::state() const {
 
 const char* LocomotionFsm::stateName() const {
     return toString(state_);
+}
+
+bool LocomotionFsm::hadIkTargetError() const {
+    return hadIkTargetError_;
 }
 
 }  // namespace spiderbot

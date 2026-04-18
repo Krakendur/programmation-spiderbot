@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bluepad_manager.hpp"
+#include "control_constants.hpp"
 #include "leg_fsm.hpp"
 
 #include <array>
@@ -20,13 +21,12 @@ public:
     const std::array<LegFSM, NUM_LEGS>& legFsms() const;
 
 private:
-    static double phase(long long timeMs, int cycleMs);
     static double computeActivity(const GamepadData& gamepadData);
+    static double phase(long long timeMs, int cycleMs);
 
     std::array<LegFSM, NUM_LEGS> legFsms_;
     bool walkEnabled_;
     int cycleMs_;
-    double activityThreshold_;
 };
 
 }  // namespace spiderbot

@@ -1,8 +1,10 @@
 #pragma once
 
 #include "bluepad_manager.hpp"
+#include "control_constants.hpp"
 #include "leg_kinematics.hpp"
 #include "locomotion_fsm.hpp"
+#include "time_utils.hpp"
 
 #include <array>
 #include <string>
@@ -39,14 +41,14 @@ public:
     // Indique si une manette a deja fourni un etat valide.
     bool isGamepadConnected() const;
 
+    // Signale si la derniere cible IK etait hors zone atteignable.
+    bool hasIkTargetError() const;
+
     // Etat courant de la FSM locomotion.
     LocomotionState getLocomotionState() const;
     const char* getLocomotionStateName() const;
 
 private:
-    // Horloge monotone en millisecondes pour la phase de marche.
-    static long long nowMs();
-
     // Applique le mapping axes/boutons -> commandes cinematiques.
     // - useAutoTripodSelection=true: choix tripod selon activite joystick.
     // - useAutoTripodSelection=false: utilise forceTripodEnabled.

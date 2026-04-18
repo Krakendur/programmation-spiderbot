@@ -17,7 +17,12 @@ namespace spiderbot {
 // - on prepare juste l'etat interne pour que le reste du logiciel
 //   (IK, InputManager, etc.) puisse fonctionner meme en simulation
 // -----------------------------------------------------------------------------
-ServoController::ServoController(const std::vector<int>& servoPins) : servoPins_(servoPins) {
+ServoController::ServoController(const std::vector<int>& servoPins)
+        : servoPins_(servoPins),
+            faultInjectionEnabled_(false),
+            failingServoId_(-1),
+            pwmWriteCallback_(),
+            pwmDetachCallback_() {
     // Position neutre logique: 90 degres pour chaque servo.
     // Cette valeur est volontairement "safe" pour la plupart des montages.
     currentPositions_.fill(90);
@@ -46,8 +51,24 @@ bool ServoController::setServoPosition(int servoId, int angle) {
         return false;
     }
 
+    if (static_cast<size_t>(servoId) >= servoPins_.size()) {
+        return false;
+    }
+
+    if (faultInjectionEnabled_ && (failingServoId_ == -1 || failingServoId_ == servoId)) {
+        return false;
+    }
+
     // Borne logicielle de securite (par rapport à l'angle).
     const int clamped = std::clamp(angle, 0, 180);
+
+    // Si un callback hardware est fourni, c'est lui qui pilote la sortie PWM.
+    if (pwmWriteCallback_) {
+        if (!pwmWriteCallback_(servoId, servoPins_[servoId], clamped)) {
+            return false;
+        }
+    }
+
     currentPositions_[servoId] = clamped;
 
     // Point d'integration materiel:
@@ -110,9 +131,11 @@ bool ServoController::centerAll() {
 // - relacher le couple (attention a la gravite sur les pattes)
 // -----------------------------------------------------------------------------
 void ServoController::stopAll() {
-    // Point d'integration materiel:
-    // - couper les canaux PWM
-    // - ou forcer une position de securite
+    if (pwmDetachCallback_) {
+        for (int i = 0; i < NUM_SERVOS && static_cast<size_t>(i) < servoPins_.size(); ++i) {
+            pwmDetachCallback_(i, servoPins_[i]);
+        }
+    }
     std::cout << "[SERVO] Arret PWM" << std::endl;
 }
 
@@ -123,6 +146,14 @@ void ServoController::setFaultInjection(bool enabled, int failingServoId) {
 
 bool ServoController::isFaultInjectionEnabled() const {
     return faultInjectionEnabled_;
+}
+
+void ServoController::setPwmWriteCallback(std::function<bool(int, int, int)> callback) {
+    pwmWriteCallback_ = std::move(callback);
+}
+
+void ServoController::setPwmDetachCallback(std::function<void(int, int)> callback) {
+    pwmDetachCallback_ = std::move(callback);
 }
 
 }  // namespace spiderbot

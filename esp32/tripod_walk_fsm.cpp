@@ -5,8 +5,7 @@
 
 namespace spiderbot {
 
-TripodWalkFSM::TripodWalkFSM()
-    : legFsms_(), walkEnabled_(false), cycleMs_(700), activityThreshold_(0.12) {}
+TripodWalkFSM::TripodWalkFSM() : legFsms_(), walkEnabled_(false), cycleMs_(700) {}
 
 double TripodWalkFSM::phase(long long timeMs, int cycleMs) {
     if (cycleMs <= 0) {
@@ -29,7 +28,7 @@ double TripodWalkFSM::computeActivity(const GamepadData& gamepadData) {
 }
 
 bool TripodWalkFSM::update(const GamepadData& gamepadData, long long timeMs) {
-    walkEnabled_ = computeActivity(gamepadData) > activityThreshold_;
+    walkEnabled_ = computeActivity(gamepadData) > kActivityThreshold;
 
     const double basePh = phase(timeMs, cycleMs_);
     for (int legId = 0; legId < NUM_LEGS; ++legId) {

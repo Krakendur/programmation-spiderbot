@@ -1,9 +1,9 @@
 #include "robot_controller.hpp"
 
-#include <chrono>
 #include <iostream>
 #include <stdexcept>
 #include <thread>
+#include <utility>
 
 namespace spiderbot {
 
@@ -20,22 +20,30 @@ constexpr int kInjectedFaultServoId = -1;
 }  // namespace
 
 RobotController::RobotController(const std::vector<int>& servoPins)
-    : servoController_(servoPins),
+        : servoController_(servoPins),
       inputManager_(),
       bluepad_(),
       robotFsm_(),
-    tripodWalkFsm_(),
-      gamepadLastActiveMs_(nowMs()),
+      tripodWalkFsm_(),
+            gamepadLastActiveMs_(spiderbot::nowMs()),
       iteration_(0),
-      safeStopApplied_(false) {
+      safeStopApplied_(false),
+      tickCallback_() {
     if (servoPins.size() != ServoController::NUM_SERVOS) {
         throw std::invalid_argument("RobotController requires exactly 18 servo pins");
     }
 }
 
-long long RobotController::nowMs() {
-    const auto now = std::chrono::steady_clock::now().time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+BluePadManager& RobotController::bluepadManager() {
+    return bluepad_;
+}
+
+ServoController& RobotController::servoController() {
+    return servoController_;
+}
+
+void RobotController::setTickCallback(std::function<void()> callback) {
+    tickCallback_ = std::move(callback);
 }
 
 const char* RobotController::modeToString(RobotMode mode) {
@@ -62,7 +70,11 @@ int RobotController::run() {
 
     while (true) {
         ++iteration_;
-        const long long currentTime = nowMs();
+        const long long currentTime = spiderbot::nowMs();
+
+        if (tickCallback_) {
+            tickCallback_();
+        }
 
         const auto gamepadData = bluepad_.update();
         const bool frameReceived = gamepadData.has_value();

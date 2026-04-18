@@ -4,19 +4,35 @@
 
 namespace spiderbot {
 
-BluePadManager::BluePadManager() : connected_(false) {
+BluePadManager::BluePadManager() : connected_(false), hasFreshFrame_(false) {
     // Ce module est volontairement minimal:
     // il isole la source de donnees manette du reste du controle robot.
-    std::cout << "[BLUEPAD] Mode simulation active" << std::endl;
+    std::cout << "[BLUEPAD] Manager pret (publier des trames via publishFrame)" << std::endl;
 }
 
 std::optional<GamepadData> BluePadManager::update() {
-    // Stub: brancher ici la librairie manette cible (ESP-IDF, Bluepad32 C++, etc.).
-    // Le contrat attendu est un GamepadData normalise (axes [-1..1], boutons booleens).
-    // En mode stub, on publie explicitement l'absence de signal.
+    // Fonctionnement event-driven:
+    // - sans nouvelle trame, on retourne std::nullopt
+    // - quand publishFrame() est appelee, update() consomme exactement une trame
+    if (!hasFreshFrame_ || !gamepadData_.has_value()) {
+        return std::nullopt;
+    }
+
+    hasFreshFrame_ = false;
+    connected_ = true;
+    return gamepadData_;
+}
+
+void BluePadManager::publishFrame(const GamepadData& frame) {
+    gamepadData_ = frame;
+    connected_ = true;
+    hasFreshFrame_ = true;
+}
+
+void BluePadManager::notifyDisconnected() {
     connected_ = false;
+    hasFreshFrame_ = false;
     gamepadData_.reset();
-    return std::nullopt;
 }
 
 bool BluePadManager::isConnected() const {

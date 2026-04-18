@@ -1,7 +1,6 @@
 #include "input_manager.hpp"
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 
 namespace spiderbot {
@@ -36,13 +35,7 @@ InputManager::InputManager() : gamepadConnected_(false) {
         {"lx", 0.0}, {"ly", 0.0}, {"rx", 0.0},
         {"ry", 0.0}, {"lt", 0.0}, {"rt", 0.0},
     };
-}
-
-long long InputManager::nowMs() {
-    // Horloge monotone: mesure de temps stable, independante de l heure systeme.
-    // Cette valeur sert a cadencer la marche tripod dans le module IK.
-    const auto now = std::chrono::steady_clock::now().time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    ikTargetError_ = false;
 }
 
 bool InputManager::processBluepadInput(const GamepadData& gamepadData) {
@@ -114,22 +107,31 @@ void InputManager::computeServoPositionsFromGamepad(bool forceTripodEnabled,
     const double yaw = rx;
     const double height = -ry;
     const double lift = std::clamp((rt - lt + 1.0) * 0.5, 0.0, 1.0);
+    const double activity = std::abs(forward) + std::abs(lateral) + std::abs(yaw);
+    const bool tripodEnabled = useAutoTripodSelection ? (activity > kActivityThreshold) : forceTripodEnabled;
 
     // Raccourci operateur: recentrage instantane en posture neutre.
     if (getButton("X")) {
         movementState_.fill(90);
+        ikTargetError_ = false;
+        locomotionFsm_.reset();
         return;
     }
 
-    // En dessous du seuil, on garde une posture statique stable.
-    // Au dessus, on active la marche tripod cadencee par le temps.
-    const double activity = std::abs(forward) + std::abs(lateral) + std::abs(yaw);
-    if (activity > 0.12) {
-        movementState_ =
-            kinematics_.computeTripodServoAngles(forward, lateral, yaw, height, nowMs(), lift);
-    } else {
-        movementState_ = kinematics_.computeServoAngles(forward, lateral, yaw, height, lift);
-    }
+    LocomotionCommand command{};
+    command.forward = forward;
+    command.lateral = lateral;
+    command.yaw = yaw;
+    command.height = height;
+    command.lift = lift;
+    command.centerRequested = false;
+    command.emergencyStopRequested = false;
+    command.gamepadConnected = gamepadConnected_;
+    command.tripodEnabled = tripodEnabled;
+    command.nowMs = spiderbot::nowMs();
+
+    movementState_ = locomotionFsm_.update(command, kinematics_);
+    ikTargetError_ = locomotionFsm_.hadIkTargetError();
 }
 
 bool InputManager::processUartCommand(const std::string& commandJson) {
@@ -140,6 +142,8 @@ bool InputManager::processUartCommand(const std::string& commandJson) {
     if (commandJson.find("\"type\":\"center_all\"") != std::string::npos) {
         // Commande de securite: retour au neutre des 18 servos.
         movementState_.fill(90);
+        ikTargetError_ = false;
+        locomotionFsm_.reset();
         return true;
     }
 
@@ -154,11 +158,30 @@ std::array<int, 18> InputManager::getServoCommands() const {
 void InputManager::reset() {
     // Reset local du module (sans effet sur l etat de connexion RF).
     movementState_.fill(90);
+    ikTargetError_ = false;
+    locomotionFsm_.reset();
 }
 
 bool InputManager::isGamepadConnected() const {
     // Indique si au moins une trame manette valide a ete recue.
     return gamepadConnected_;
+}
+
+void InputManager::notifyGamepadDisconnected() {
+    gamepadConnected_ = false;
+    reset();
+}
+
+bool InputManager::hasIkTargetError() const {
+    return ikTargetError_;
+}
+
+LocomotionState InputManager::getLocomotionState() const {
+    return locomotionFsm_.state();
+}
+
+const char* InputManager::getLocomotionStateName() const {
+    return locomotionFsm_.stateName();
 }
 
 }  // namespace spiderbot

@@ -23,6 +23,7 @@ struct LocomotionCommand {
     bool centerRequested;
     bool emergencyStopRequested;
     bool gamepadConnected;
+    bool tripodEnabled;
     long long nowMs;
 };
 
@@ -36,6 +37,7 @@ public:
     void reset();
     LocomotionState state() const;
     const char* stateName() const;
+    bool hadIkTargetError() const;
 
 private:
     static constexpr double kActivityThreshold = 0.12;
@@ -45,6 +47,7 @@ private:
     static const char* toString(LocomotionState state);
 
     LocomotionState state_;
+    bool hadIkTargetError_;
 };
 
 }  // namespace spiderbot

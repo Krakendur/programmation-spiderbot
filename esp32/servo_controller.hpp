@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <vector>
 
 namespace spiderbot {
@@ -39,6 +40,15 @@ public:
     // Indique si l'injection de faute est active.
     bool isFaultInjectionEnabled() const;
 
+    // Configure la fonction d'ecriture PWM materielle.
+    // Signature: (servoId, gpioPin, angleDeg) -> succes.
+    // Si non configuree, la classe reste en mode simulation interne.
+    void setPwmWriteCallback(std::function<bool(int, int, int)> callback);
+
+    // Configure la fonction de detach/arret materiel par servo.
+    // Signature: (servoId, gpioPin).
+    void setPwmDetachCallback(std::function<void(int, int)> callback);
+
 private:
     // Liste des GPIO associes aux 18 servos.
     std::vector<int> servoPins_;
@@ -49,6 +59,10 @@ private:
     // Outils de test securite: simulation de defaut servo.
     bool faultInjectionEnabled_;
     int failingServoId_;
+
+    // Ponts vers la couche hardware (LEDC, PCA9685, etc.).
+    std::function<bool(int, int, int)> pwmWriteCallback_;
+    std::function<void(int, int)> pwmDetachCallback_;
 };
 
 }  // namespace spiderbot

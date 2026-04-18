@@ -125,7 +125,8 @@ double LegKinematics::transferCurve(double u) {
 // - y: vers l'exterieur du robot
 // - z: vers le haut (donc pied au sol => z negatif)
 // -----------------------------------------------------------------------------
-std::array<double, 3> LegKinematics::solveLegIk(double x, double y, double z) const {
+std::array<double, 3> LegKinematics::solveLegIk(double x, double y, double z,
+                                                bool* unreachableTarget) const {
     // Etape 1: orientation horizontale (coxa).
     const double coxaDeg = std::atan2(y, x) * 180.0 / kPi;
 
@@ -240,8 +241,10 @@ LegKinematics::IkComputationResult LegKinematics::computeServoAnglesWithStatus(d
         const double tz = nfz - dz + dzLift;
 
         // IK locale puis conversion vers angles servo physiques.
-        const auto joint = solveLegIk(tx, ty, tz);
+        bool unreachableTarget = false;
+        const auto joint = solveLegIk(tx, ty, tz, &unreachableTarget);
         const auto servo = jointToServo(legId, joint[0], joint[1], joint[2]);
+        result.hadUnreachableTarget = result.hadUnreachableTarget || unreachableTarget;
 
         const int i = legId * SERVOS_PER_LEG;
         result.angles[i] = servo[0];
@@ -333,8 +336,10 @@ LegKinematics::IkComputationResult LegKinematics::computeTripodServoAnglesWithSt
         const double tz = nfz - (h * maxHeightShift) + swingZ + extraLift;
 
         // Resolution IK puis mapping servo (offset/sens/limites).
-        const auto joint = solveLegIk(tx, ty, tz);
+        bool unreachableTarget = false;
+        const auto joint = solveLegIk(tx, ty, tz, &unreachableTarget);
         const auto servo = jointToServo(legId, joint[0], joint[1], joint[2]);
+        result.hadUnreachableTarget = result.hadUnreachableTarget || unreachableTarget;
 
         const int i = legId * SERVOS_PER_LEG;
         result.angles[i] = servo[0];
@@ -344,7 +349,7 @@ LegKinematics::IkComputationResult LegKinematics::computeTripodServoAnglesWithSt
 
     // Tableau final de 18 angles pret a etre envoye a ServoController.
     // Ordre: [patte0 coxa,femur,tibia, patte1 coxa,femur,tibia, ..., patte5 ...]
-    return out;
+    return result;
 }
 
 }  // namespace spiderbot

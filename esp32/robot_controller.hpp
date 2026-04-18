@@ -1,11 +1,13 @@
 #pragma once
 
 #include "bluepad_manager.hpp"
+#include "control_constants.hpp"
 #include "input_manager.hpp"
 #include "robot_fsm.hpp"
 #include "servo_controller.hpp"
 #include "tripod_walk_fsm.hpp"
 
+#include <functional>
 #include <vector>
 
 namespace spiderbot {
@@ -17,11 +19,15 @@ public:
     // Starts the 50 Hz control loop.
     int run();
 
-private:
-    static long long nowMs();
-    static const char* modeToString(RobotMode mode);
+    // Expose des points d'integration pour la couche hardware.
+    BluePadManager& bluepadManager();
+    ServoController& servoController();
 
-    static constexpr int kBluepadTimeoutMs = 500;
+    // Callback optionnel appele a chaque tick de boucle avant la lecture des entrees.
+    void setTickCallback(std::function<void()> callback);
+
+private:
+    static const char* modeToString(RobotMode mode);
 
     ServoController servoController_;
     InputManager inputManager_;
@@ -32,6 +38,7 @@ private:
     long long gamepadLastActiveMs_;
     int iteration_;
     bool safeStopApplied_;
+    std::function<void()> tickCallback_;
 };
 
 }  // namespace spiderbot
