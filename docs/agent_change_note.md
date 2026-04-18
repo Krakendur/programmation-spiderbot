@@ -46,6 +46,23 @@ Branche: Spidey-c++
   - ordre pratique de test: coxa, femur, tibia sur chaque patte avant,
   - les autres servos restent en simulation logique.
 
+## Validation de cette passe
+
+- Compilation desktop de la simulation ESP32 reussie avec `g++`.
+- Lancement de `spiderbot_esp32_sim.exe` reussi sans materiel.
+- Verification dans les logs de:
+  - l'initialisation generale,
+  - le mode simulation sans backend hardware,
+  - les phases `REST`, `FORWARD`, `TURN`, `CENTER`, `WALK_LIGHT`,
+  - les logs FSM `[FSM]` au moins au passage teleop,
+  - les logs d'etat periodiques `[STATUS]`.
+- Arret volontaire du processus apres confirmation du demarrage et du deroulement des phases.
+
+## Ajustement apres validation
+
+- Le log FSM a ete rendu periodique dans `RobotController` pour apparaitre meme quand le mode reste `TELEOP`.
+- Objectif: garder une trace visible de l'activite FSM pendant la simulation complete sans materiel.
+
 ## Futur (prochaines etapes recommandees)
 
 - Valider le mode hybride sur banc, puis etendre progressivement le backend PWM direct sans driver externe.

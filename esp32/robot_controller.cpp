@@ -99,7 +99,7 @@ int RobotController::run() {
         robotFsm_.update(fsmInput);
 
         const RobotMode currentMode = robotFsm_.mode();
-        if (currentMode != lastLoggedMode_) {
+        if (currentMode != lastLoggedMode_ || iteration_ % 20 == 0) {
             std::cout << "[FSM] mode=" << modeToString(currentMode)
                       << " frame=" << (frameReceived ? "yes" : "no")
                       << " seen=" << (gamepadSeen ? "yes" : "no")
