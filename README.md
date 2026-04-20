@@ -139,6 +139,9 @@ Un module de wiring runtime est disponible:
 
 - `esp32/esp32_runtime_wiring.hpp`
 - `esp32/esp32_runtime_wiring.cpp`
+- `docs/hybrid_validation_protocol.md` (procedure de test hybride materiel)
+- `docs/hybrid_validation_checklist.md` (checklist terrain 1 page)
+- `docs/ps5_controller_and_servo_wiring.md` (appairage DualSense + mapping servo->GPIO)
 
 Il est appele automatiquement depuis `esp32/main.cpp` via `configureEsp32RuntimeWiring(controller)`.
 
@@ -158,3 +161,35 @@ Pour les 18 servos, il faudra ensuite un backend PWM adapte (multiplexage ou sch
 
 Tant que ces callbacks ne sont pas relies a du code cible ESP32, le projet reste en mode logique/simulation.
 ---
+
+## Build ESP32 avec PlatformIO
+
+Un fichier `platformio.ini` est fourni a la racine du repo avec 3 profils:
+
+- `esp32dev-sim`: build de base (simulation).
+- `esp32dev-hybrid`: active `SPIDERBOT_USE_LEDC_EXAMPLE`.
+- `esp32dev-ps5-hybrid`: active `SPIDERBOT_USE_LEDC_EXAMPLE` + `SPIDERBOT_USE_BLUEPAD32_EXAMPLE`.
+
+Commandes principales (depuis la racine du projet):
+
+```powershell
+pio run -e esp32dev-sim
+pio run -e esp32dev-hybrid
+pio run -e esp32dev-ps5-hybrid
+```
+
+Flash et monitor serie (adapter le port):
+
+```powershell
+pio run -e esp32dev-ps5-hybrid -t upload --upload-port COM3
+pio device monitor -b 115200 -p COM3
+```
+
+Log attendu si la manette Bluepad32 est bien activee:
+
+- `[ESP32] Bluepad32 example backend active`
+
+Si vous voyez `[ESP32] Bluepad32 backend disabled (simulation input)`, alors soit:
+
+- le profil de build actif n'inclut pas la macro Bluepad32,
+- soit `Bluepad32.h` n'est pas disponible dans l'environnement de build.
