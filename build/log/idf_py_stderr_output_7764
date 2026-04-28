@@ -1,0 +1,9 @@
+CMake Error at C:/Users/abdec/esp/v5.4.2/esp-idf/tools/cmake/project.cmake:472 (message):
+  Directory specified in EXTRA_COMPONENT_DIRS doesn't exist:
+  C:/Users/abdec/OneDrive/Ynov/projet fin d'Útudes/Spider-Bot/programmation
+  spiderbot/external/esp-idf-arduino-bluepad32-template/components/bluepad32
+Call Stack (most recent call first):
+  C:/Users/abdec/esp/v5.4.2/esp-idf/tools/cmake/project.cmake:556 (__project_init)
+  CMakeLists.txt:15 (project)
+
+
