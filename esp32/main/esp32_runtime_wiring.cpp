@@ -1,15 +1,22 @@
 #include "esp32_runtime_wiring.hpp"
 
-#include <cmath>
 #include <cstring>
 #include <iostream>
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(SPIDERBOT_USE_LEDC_EXAMPLE)
 #include <Arduino.h>
+#if __has_include(<ESP32Servo.h>)
+#include <ESP32Servo.h>
+#define SPIDERBOT_HAS_ESP32SERVO 1
+#endif
 #endif
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(SPIDERBOT_USE_BLUEPAD32_EXAMPLE) && __has_include(<Bluepad32.h>)
 #include <Bluepad32.h>
+#endif
+
+#ifndef SPIDERBOT_HAS_ESP32SERVO
+#define SPIDERBOT_HAS_ESP32SERVO 0
 #endif
 
 namespace spiderbot {
@@ -20,15 +27,6 @@ constexpr Esp32RuntimeWiringOptions kDefaultHybridOptions{
     Esp32WiringMode::HybridValidation,
     kDefaultHybridValidationServoIds,
 };
-
-bool isValidationServo(int servoId, const std::array<int, 6>& activeServoIds) {
-    for (int activeServoId : activeServoIds) {
-        if (activeServoId == servoId) {
-            return true;
-        }
-    }
-    return false;
-}
 
 GamepadData buildSimulationFrame(int step) {
     GamepadData data;
@@ -76,25 +74,6 @@ const char* simulationPhaseLabel(int step) {
     return "REST";
 }
 
-const char* validationServoLabel(int servoId) {
-    switch (servoId) {
-        case 0:
-            return "front-left coxa";
-        case 1:
-            return "front-left femur";
-        case 2:
-            return "front-left tibia";
-        case 9:
-            return "front-right coxa";
-        case 10:
-            return "front-right femur";
-        case 11:
-            return "front-right tibia";
-        default:
-            return "inactive";
-    }
-}
-
 #if defined(ARDUINO_ARCH_ESP32) && defined(SPIDERBOT_USE_BLUEPAD32_EXAMPLE) && __has_include(<Bluepad32.h>)
 
 RobotController* gController = nullptr;
@@ -137,21 +116,54 @@ void onDisconnectedGamepad(GamepadPtr gp) {
 
 #endif
 
-#if defined(ARDUINO_ARCH_ESP32) && defined(SPIDERBOT_USE_LEDC_EXAMPLE)
+#if defined(ARDUINO_ARCH_ESP32) && defined(SPIDERBOT_USE_LEDC_EXAMPLE) && SPIDERBOT_HAS_ESP32SERVO
 
-constexpr int kLedcMaxChannels = 16;
 constexpr int kServoPwmFreqHz = 50;
-constexpr int kServoPwmResolutionBits = 16;
 constexpr int kServoMinPulseUs = 500;
 constexpr int kServoMaxPulseUs = 2500;
+std::array<Servo, ServoController::NUM_SERVOS> gServos;
+std::array<bool, ServoController::NUM_SERVOS> gServoAttached{};
 
-int angleToDuty(int angleDeg) {
-    const int clamped = (angleDeg < 0) ? 0 : ((angleDeg > 180) ? 180 : angleDeg);
-    const double pulseUs =
-        kServoMinPulseUs + (static_cast<double>(clamped) / 180.0) * (kServoMaxPulseUs - kServoMinPulseUs);
-    const double periodUs = 1000000.0 / static_cast<double>(kServoPwmFreqHz);
-    const double maxDuty = static_cast<double>((1U << kServoPwmResolutionBits) - 1U);
-    return static_cast<int>(std::round((pulseUs / periodUs) * maxDuty));
+bool isValidationServo(int servoId, const std::array<int, 6>& activeServoIds) {
+    for (int activeServoId : activeServoIds) {
+        if (activeServoId == servoId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+const char* validationServoLabel(int servoId) {
+    switch (servoId) {
+        case 0:
+            return "front-left coxa";
+        case 1:
+            return "front-left femur";
+        case 2:
+            return "front-left tibia";
+        case 9:
+            return "front-right coxa";
+        case 10:
+            return "front-right femur";
+        case 11:
+            return "front-right tibia";
+        default:
+            return "inactive";
+    }
+}
+
+bool isServoIdValid(int servoId) {
+    return servoId >= 0 && servoId < ServoController::NUM_SERVOS;
+}
+
+int clampServoAngle(int angleDeg) {
+    if (angleDeg < 0) {
+        return 0;
+    }
+    if (angleDeg > 180) {
+        return 180;
+    }
+    return angleDeg;
 }
 
 #endif
@@ -191,21 +203,20 @@ void configureEsp32RuntimeWiring(RobotController& controller,
     });
 #endif
 
-#if defined(ARDUINO_ARCH_ESP32) && defined(SPIDERBOT_USE_LEDC_EXAMPLE)
+#if defined(ARDUINO_ARCH_ESP32) && defined(SPIDERBOT_USE_LEDC_EXAMPLE) && SPIDERBOT_HAS_ESP32SERVO
     if (options.mode == Esp32WiringMode::HybridValidation) {
-        std::cout << "[ESP32] LEDC hybrid validation backend active (6 servos)" << std::endl;
+        std::cout << "[ESP32] ESP32Servo hybrid validation backend active (6 servos)" << std::endl;
         for (int servoId : options.validationServoIds) {
             std::cout << "[ESP32]   - servo " << servoId << " : "
                       << validationServoLabel(servoId) << std::endl;
         }
     } else {
-        std::cout << "[ESP32] LEDC backend active" << std::endl;
+        std::cout << "[ESP32] ESP32Servo backend active" << std::endl;
     }
 
     auto& servo = controller.servoController();
     servo.setPwmWriteCallback([options](int servoId, int gpioPin, int angleDeg) {
-        // Exemple LEDC minimal. Attention: ESP32 LEDC natif limite a 16 channels.
-        if (servoId < 0 || servoId >= kLedcMaxChannels) {
+        if (!isServoIdValid(servoId)) {
             // Retourner false fait remonter un defaut servo vers la FSM de securite.
             return false;
         }
@@ -216,29 +227,37 @@ void configureEsp32RuntimeWiring(RobotController& controller,
             return true;
         }
 
-        const int channel = servoId;
-        static bool channelInitialized[kLedcMaxChannels] = {false};
-        if (!channelInitialized[channel]) {
-            ledcSetup(channel, kServoPwmFreqHz, kServoPwmResolutionBits);
-            ledcAttachPin(gpioPin, channel);
-            channelInitialized[channel] = true;
+        if (!gServoAttached[servoId]) {
+            gServos[servoId].setPeriodHertz(kServoPwmFreqHz);
+            gServos[servoId].attach(gpioPin, kServoMinPulseUs, kServoMaxPulseUs);
+            gServoAttached[servoId] = true;
         }
 
-        const int duty = angleToDuty(angleDeg);
-        ledcWrite(channel, duty);
+        gServos[servoId].write(clampServoAngle(angleDeg));
         return true;
     });
 
     servo.setPwmDetachCallback([options](int servoId, int gpioPin) {
-        if (servoId < 0 || servoId >= kLedcMaxChannels) {
+        (void)gpioPin;
+        if (!isServoIdValid(servoId)) {
             return;
         }
         if (options.mode == Esp32WiringMode::HybridValidation &&
             !isValidationServo(servoId, options.validationServoIds)) {
             return;
         }
-        ledcDetachPin(gpioPin);
+        if (gServoAttached[servoId]) {
+            gServos[servoId].detach();
+            gServoAttached[servoId] = false;
+        }
     });
+#elif defined(ARDUINO_ARCH_ESP32) && defined(SPIDERBOT_USE_LEDC_EXAMPLE)
+    std::cout << "[ESP32] ESP32Servo library missing, runtime wiring stays in simulation mode" << std::endl;
+    controller.servoController().setPwmWriteCallback([](int, int, int) {
+        return true;
+    });
+    controller.servoController().setPwmDetachCallback([](int, int) {});
+    (void)options;
 #else
     // Fallback dev: garde le mode simulation pour permettre les tests de logique FSM/IK.
     std::cout << "[ESP32] Runtime wiring in simulation mode (no hardware backend)" << std::endl;

@@ -6,6 +6,8 @@ When generating code for this repository, keep the architecture explicit and do 
 
 - ESP32 handles locomotion only.
 - Raspberry Pi handles audio-visual features only.
+- ESP32 source files live in `esp32/main/`; keep `esp32/platformio.ini` as the PlatformIO entry point.
+- Shared protocol placeholders live in `common/`, but no active ESP32/Raspberry Pi communication exists yet.
 - Do not move audio/video control into ESP32 code.
 - Do not drive servos from Raspberry Pi code in the current version.
 - The global FSM supervises the system mode and does not perform IK math.

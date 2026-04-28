@@ -1,148 +1,96 @@
-﻿# Architecture Spider-Bot - Version actuelle
+# Architecture Spider-Bot - etat actuel
 
 ## Vue d'ensemble
 
-Le projet Spider-Bot est un robot hexapode en C++ organise autour de deux sous-systemes independants:
+Spider-Bot est decoupe en deux sous-systemes volontairement separes:
 
-- ESP32: manette, calcul de mouvement, cinematique inverse, demarche et commande des 18 servomoteurs
-- Raspberry Pi Zero 2 W: audio-visuel (camera, microphone, haut-parleur)
+- `esp32/`: locomotion, manette DualSense, FSM, cinematique inverse et servos.
+- `raspberry_pi/`: audio-visuel local, camera, micro et haut-parleur.
 
-Dans la version actuelle, les deux blocs sont separes:
+Aucun canal ESP32 <-> Raspberry Pi n'est actif dans cette version. Le dossier
+`common/` contient seulement une base de protocole pour preparer cette evolution.
 
-- ESP32 = mouvement uniquement
-- Raspberry Pi = audio/video uniquement
-- pas de communication fonctionnelle active ESP32 <-> Raspberry Pi
-
----
-
-## Architecture globale
+## Arborescence utile
 
 ```text
-                                                 MANETTE (Bluetooth)
-                                                                |
-                                                                v
-                                     +---------------------------+
-                                     |   ESP32 - Locomotion      |
-                                     |---------------------------|
-                                     | bluepad_manager           |
-                                     | input_manager             |
-                                     | leg_kinematics            |
-                                     | servo_controller          |
-                                     +-------------+-------------+
-                                                                 |
-                                                                 v
-                                                18 Servomoteurs
+esp32/
+  platformio.ini
+  sdkconfig.defaults
+  CMakeLists.txt
+  components/
+  main/
+    main.cpp
+    robot_controller.hpp / .cpp
+    robot_fsm.hpp / .cpp
+    tripod_walk_fsm.hpp / .cpp
+    leg_fsm.hpp / .cpp
+    servo_controller.hpp / .cpp
+    input_manager.hpp / .cpp
+    bluepad_manager.hpp / .cpp
+    leg_kinematics.hpp / .cpp
+    esp32_runtime_wiring.hpp / .cpp
 
+raspberry_pi/
+  main.cpp
+  camera_manager.hpp / .cpp
+  audio_manager.hpp / .cpp
 
-                                     +---------------------------+
-                                     | Raspberry Pi Zero 2 W     |
-                                     |---------------------------|
-                                     | camera_manager            |
-                                     | audio_manager             |
-                                     +-------------+-------------+
-                                                                 |
-                                                                 v
-                                                Camera / Micro / HP
-
-                     (Aucun canal de communication actif entre les 2 blocs)
+common/
+  protocol.hpp / .cpp
 ```
 
----
+## Responsabilites ESP32
 
-## Locomotion - modele patte
-
-Le robot a 6 pattes avec 3 articulations par patte:
-
-- coxa: rotation horizontale
-- femur: levage/deploiement
-- tibia: hauteur et extension terminale
-
-Total actionneurs: 6 x 3 = 18 servomoteurs.
-
-Pipeline de locomotion:
-
-1. Reception de la consigne utilisateur (manette)
-2. Conversion en cibles de pieds (x, y, z)
-3. Calcul des angles articulaires (cinematique inverse)
-4. Emission des commandes PWM vers les 18 servos
-
----
-
-## Architecture Logicielle ESP32
-
-### Modules
-
-| Module | Role |
-|--------|------|
-| servo_controller.cpp/.hpp | Gestion PWM 18 servos (50Hz) |
-| input_manager.cpp/.hpp | Traitement entrees manette + mapping cinematique |
-| bluepad_manager.cpp/.hpp | Interface manette Bluepad |
-| leg_kinematics.cpp/.hpp | Cinematique inverse + demarche tripod |
-| main.cpp | Boucle principale ESP32 |
-
-### Flux de Donnees
-
-```
-MANETTE BLUEPAD32
-    ↓ Bluetooth 2.4GHz
-    └─→ ESP32
-        ↓
-        Input Manager
-        ↓
-        Leg Kinematics
-        ↓
-        Servo Controller
-        ↓
-        PWM GPIO (18x)
-        ↓
-    SERVOMOTEURS MG996R
-```
-
-### Priorites d'Entree
-
-1. Manette Bluepad32 (principale si connectee)
-2. Position neutre (timeout auto 500ms)
-
----
-
-## Architecture logicielle Raspberry Pi
-
-| Module | Role |
-|--------|------|
-| main.cpp | Boucle principale audio-visuelle |
-| camera_manager.cpp/.hpp | Capture et gestion camera |
-| audio_manager.cpp/.hpp | Entree micro et sortie audio |
-
-Flux logique:
+`RobotController` orchestre la boucle 50 Hz et applique les priorites de securite.
+La chaine de locomotion est:
 
 ```text
-Camera/Micro
-    -> camera_manager / audio_manager
-    -> traitement local Raspberry Pi
-    -> sortie audio/video locale
+BluePadManager
+  -> InputManager
+  -> TripodWalkFSM + LegFSM[6]
+  -> LegKinematics
+  -> ServoController
+  -> backend runtime ESP32Servo ou simulation
 ```
 
----
+Les FSM sont separees par niveau:
 
-## Espace commun
+- `RobotFSM`: mode global (`IDLE`, `TELEOP`, `SAFE_STOP`, `ERROR`).
+- `TripodWalkFSM`: alternance des deux tripodes.
+- `LegFSM`: etat local de chaque patte.
 
-Le dossier common contient une base de protocole partagee:
+`LegKinematics` reste du calcul pur et ne touche jamais au materiel.
+`ServoController` est le seul point de sortie vers les PWM.
 
-- protocol.hpp
-- protocol.cpp
+## Responsabilites Raspberry Pi
 
-Ce module prepare l'evolution vers une communication inter-cartes, mais cette communication n'est pas encore active dans l'etat actuel.
+Le code Raspberry Pi reste limite a l'audio-visuel:
 
----
+- `camera_manager`: capture et gestion camera.
+- `audio_manager`: entree micro et sortie audio.
+- `main.cpp`: boucle locale de demonstration.
 
-## Lien avec la future FSM
+La Raspberry Pi ne pilote pas les servos dans l'etat actuel du projet.
 
-Le code actuel reste modularise par responsabilite (input, kinematics, servo, audio, camera). Cette decomposition est compatible avec une evolution vers une architecture FSM vue en cours.
+## Build ESP32
 
-Projection FSM (non implementee integralement a ce stade):
+Le build PlatformIO se lance depuis `esp32/`:
 
-- Etats locomotion potentiels: Idle, Stand, Walk, Turn, EmergencyStop
-- Etats audio-visuels potentiels: IdleAV, Capture, Record, Playback
-- Evenements futurs: ordre utilisateur, timeout, perte manette, defaut composant
+```powershell
+pio run -e esp32dev-sim
+pio run -e esp32dev-hybrid
+pio run -e esp32dev-ps5-hybrid
+```
 
-Objectif: formaliser les transitions d'etat sans casser les modules deja en place.
+Les fichiers `CMakeLists.txt` et `sdkconfig.defaults` gardent une base compatible
+ESP-IDF + Arduino-core pour le template Bluepad32. Le profil PlatformIO actuel
+reste le chemin le plus direct pour compiler le code du robot.
+
+## Securites implementees
+
+- Timeout manette centralise dans `RobotController` (`500 ms`).
+- Perte de signal vers `SAFE_STOP`.
+- Recentrement via `ServoController::centerAll()`.
+- Remontee des erreurs IK impossibles jusqu'a `RobotFSM`.
+- Remontee des defauts servo via le retour `false` des callbacks PWM.
+- Mode `ERROR` verrouillant les sorties par `stopAll()`.

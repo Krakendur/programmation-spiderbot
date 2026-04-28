@@ -9,8 +9,8 @@
 namespace {
 
 std::vector<int> getServoPins() {
-    // Mapping logique servo_id -> GPIO. A adapter au cablage reel.
-    return {2, 4, 5, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32};
+    // Mapping logique servo_id -> GPIO selon le tableau du README.
+    return {13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 4, 5, 2};
 }
 
 std::unique_ptr<spiderbot::RobotController> gController;

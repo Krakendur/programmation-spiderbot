@@ -60,7 +60,7 @@ private:
     bool faultInjectionEnabled_;
     int failingServoId_;
 
-    // Ponts vers la couche hardware (LEDC, PCA9685, etc.).
+    // Ponts vers la couche hardware (ESP32Servo, LEDC, PCA9685, etc.).
     std::function<bool(int, int, int)> pwmWriteCallback_;
     std::function<void(int, int)> pwmDetachCallback_;
 };

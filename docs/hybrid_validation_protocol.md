@@ -11,7 +11,7 @@ Valider sur banc la chaine complete ESP32 pour un sous-ensemble de 6 servos:
 - entree manette,
 - FSM globale + locomotion,
 - IK,
-- sortie servo via backend PWM reel (mode hybride).
+- sortie servo via backend ESP32Servo reel (mode hybride).
 
 Le test ne couvre pas la partie Raspberry Pi (audio/video).
 
@@ -28,15 +28,15 @@ Le mode hybride par defaut active uniquement les servos:
 
 Reference code:
 
-- `esp32/esp32_runtime_wiring.hpp`: `kDefaultHybridValidationServoIds`
-- `esp32/esp32_runtime_wiring.cpp`: mode `Esp32WiringMode::HybridValidation`
+- `esp32/main/esp32_runtime_wiring.hpp`: `kDefaultHybridValidationServoIds`
+- `esp32/main/esp32_runtime_wiring.cpp`: mode `Esp32WiringMode::HybridValidation`
 
 ## Prerequis
 
 ## Prerequis logiciels
 
 - Build desktop passe (sanity check logique).
-- Build ESP32 avec backend LEDC d'exemple active.
+- Build ESP32 avec backend ESP32Servo d'exemple active.
 - Optionnel: build ESP32 avec backend Bluepad32 d'exemple active.
 
 ## Prerequis banc materiel
@@ -51,8 +51,9 @@ Reference code:
 Depuis la racine du repo:
 
 ```powershell
-g++ -std=c++17 -Wall -Wextra -pedantic .\esp32\*.cpp .\common\*.cpp -I.\esp32 -I.\common -o .\spiderbot_esp32_sim_check.exe
-.\spiderbot_esp32_sim_check.exe
+New-Item -ItemType Directory -Force build
+g++ -std=c++17 -Wall -Wextra -pedantic .\esp32\main\*.cpp .\common\*.cpp -I.\esp32\main -I.\common -o .\build\spiderbot_esp32_sim_check.exe
+.\build\spiderbot_esp32_sim_check.exe
 ```
 
 Attendus minimum dans les logs:
@@ -63,10 +64,10 @@ Attendus minimum dans les logs:
 
 ## Gate 1 - Demarrage hybride sur ESP32
 
-1. Flasher le firmware ESP32 configure pour le mode hybride LEDC.
+1. Flasher le firmware ESP32 configure pour le mode hybride ESP32Servo.
 2. Demarrer sans poser le robot au sol.
 3. Verifier dans les logs:
-   - activation backend LEDC hybride,
+   - activation backend ESP32Servo hybride,
    - affichage des 6 IDs servos de validation,
    - absence de passage immediat en `ERROR`.
 

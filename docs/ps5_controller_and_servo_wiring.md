@@ -31,26 +31,16 @@ Si frame=no en continu, la manette n'envoie pas de trame exploitee.
 
 Le mapping actuel du code est defini par la liste servo_id -> GPIO.
 
-Source: esp32/main.cpp
+Source: `esp32/main/main.cpp`
 
-- servo 0  -> GPIO 2
-- servo 1  -> GPIO 4
-- servo 2  -> GPIO 5
-- servo 3  -> GPIO 12
-- servo 4  -> GPIO 13
-- servo 5  -> GPIO 14
-- servo 6  -> GPIO 15
-- servo 7  -> GPIO 16
-- servo 8  -> GPIO 17
-- servo 9  -> GPIO 18
-- servo 10 -> GPIO 19
-- servo 11 -> GPIO 21
-- servo 12 -> GPIO 22
-- servo 13 -> GPIO 23
-- servo 14 -> GPIO 25
-- servo 15 -> GPIO 26
-- servo 16 -> GPIO 27
-- servo 17 -> GPIO 32
+| Patte | Servo IDs | GPIO |
+|---|---:|---|
+| Avant gauche | 0 / 1 / 2 | 13 / 14 / 15 |
+| Milieu gauche | 3 / 4 / 5 | 16 / 17 / 18 |
+| Arriere gauche | 6 / 7 / 8 | 19 / 21 / 22 |
+| Avant droite | 9 / 10 / 11 | 23 / 25 / 26 |
+| Milieu droite | 12 / 13 / 14 | 27 / 32 / 33 |
+| Arriere droite | 15 / 16 / 17 | 4 / 5 / 2 |
 
 ## 3) Branchement electrique obligatoire (important)
 
@@ -68,4 +58,4 @@ Sans GND commun, le signal PWM peut devenir instable.
 3. Verifier recentrage puis commandes legeres.
 4. Etendre ensuite progressivement.
 
-Rappel: l'exemple LEDC natif couvre 16 channels. Pour 18 servos en reel, prevoir un backend PWM adapte.
+Rappel: le backend hybride utilise `ESP32Servo` via la macro existante `SPIDERBOT_USE_LEDC_EXAMPLE`.

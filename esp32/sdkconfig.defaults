@@ -1,0 +1,5 @@
+# Defaults for the ESP32 WROOM-32 / DevKit V1 target.
+# Keep this project on the original ESP32: Bluepad32 + DualSense need Bluetooth Classic.
+CONFIG_IDF_TARGET="esp32"
+CONFIG_IDF_TARGET_ESP32=y
+CONFIG_AUTOSTART_ARDUINO=y
