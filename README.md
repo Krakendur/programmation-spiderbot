@@ -241,7 +241,7 @@ Il est appelé automatiquement depuis `esp32/main/main.cpp` via `configureEsp32R
 ### Macros de build optionnelles
 
 - `SPIDERBOT_USE_BLUEPAD32_EXAMPLE` : active le pont Bluepad32 → `BluePadManager`.
-- `SPIDERBOT_USE_LEDC_EXAMPLE` : active la sortie PWM réelle via `ESP32Servo` vers `ServoController`.
+- `SPIDERBOT_USE_LEDC_EXAMPLE` : active la sortie PWM LEDC directe vers `ServoController`.
 
 ### Mode hybride de validation
 
@@ -291,7 +291,7 @@ Trois environnements sont définis dans `platformio.ini` :
 | Profil | Description | Macros |
 |---|---|---|
 | `esp32dev-sim` | Build de base (simulation, pas de hardware) | aucune |
-| `esp32dev-hybrid` | Sortie PWM réelle via ESP32Servo, manette simulée | `SPIDERBOT_USE_LEDC_EXAMPLE` |
+| `esp32dev-hybrid` | Sortie PWM LEDC réelle, manette simulée | `SPIDERBOT_USE_LEDC_EXAMPLE` |
 | `esp32dev-ps5-hybrid` | PWM réel + DualSense Bluepad32 | `SPIDERBOT_USE_LEDC_EXAMPLE` + `SPIDERBOT_USE_BLUEPAD32_EXAMPLE` |
 
 ### Commandes principales

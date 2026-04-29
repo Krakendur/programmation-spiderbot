@@ -94,8 +94,9 @@ GamepadData fromBluepad(GamepadPtr gp) {
     data.buttons["B"] = gp->b();
     data.buttons["X"] = gp->x();
     data.buttons["Y"] = gp->y();
-    data.buttons["START"] = gp->start();
-    data.buttons["SELECT"] = gp->select();
+    // Bluepad32 ESP32: start/select passent par le masque miscButtons().
+    data.buttons["START"] = (gp->miscButtons() & MISC_BUTTON_START) != 0;
+    data.buttons["SELECT"] = (gp->miscButtons() & MISC_BUTTON_BACK) != 0;
     return data;
 }
 
@@ -180,13 +181,10 @@ void configureEsp32RuntimeWiring(RobotController& controller,
     std::cout << "[ESP32] Bluepad32 example backend active" << std::endl;
     gController = &controller;
     BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
+    // Sur ESP32, Bluepad32 notifie via les callbacks onConnected/onDisconnected.
+    // BP32.update() traite les evenements entrants a chaque tick.
     controller.setTickCallback([]() {
         BP32.update();
-        for (auto gp : BP32.getGamepads()) {
-            if (gp && gp->isConnected()) {
-                gController->bluepadManager().publishFrame(fromBluepad(gp));
-            }
-        }
     });
 #else
     std::cout << "[ESP32] Bluepad32 backend disabled (simulation input)" << std::endl;

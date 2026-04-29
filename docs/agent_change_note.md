@@ -24,8 +24,8 @@ Points a verifier par une passe suivante:
 - Les profils hardware installent `madhephaestus/ESP32Servo`; verifier sur machine avec acces PlatformIO.
 - Le backend DualSense reste conditionne par la presence reelle de `Bluepad32.h`.
 
-Date: 2026-04-18
-Branche: Spidey-c++
+Date: 2026-04-28
+Branche: retour_platformio
 
 ## Passe (deja effectue avant cette passe)
 

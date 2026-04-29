@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:/Users/abdec/OneDrive/Ynov/projet_fin_etudes/Spider-Bot/programmation _spider-bot\" diff main..HEAD --name-status)"
+    ]
+  }
+}

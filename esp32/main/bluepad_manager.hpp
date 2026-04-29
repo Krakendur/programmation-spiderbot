@@ -38,8 +38,13 @@ public:
     void notifyDisconnected();
 
 private:
+    GamepadData applyJoystickOrigin(const GamepadData& frame);
+
     // Etat de lien courant.
     bool connected_;
+
+    bool joystickOriginCaptured_;
+    std::map<std::string, double> joystickOrigin_;
 
     // Cache de la derniere trame utile pour debug/inspection.
     std::optional<GamepadData> gamepadData_;

@@ -3,3 +3,14 @@
 CONFIG_IDF_TARGET="esp32"
 CONFIG_IDF_TARGET_ESP32=y
 CONFIG_AUTOSTART_ARDUINO=y
+
+# Bluetooth Classic (BR/EDR) requis pour DualSense via Bluepad32.
+CONFIG_BT_ENABLED=y
+CONFIG_BTDM_CTRL_MODE_BR_EDR_ONLY=y
+# Keep the ESP32 BT controller awake during high-rate HID reports.
+# CONFIG_BTDM_CTRL_MODEM_SLEEP is not set
+
+# Bluepad32: plateforme custom (implementee dans bt_test_main.c).
+CONFIG_BLUEPAD32_PLATFORM_CUSTOM=y
+# BLE desactive: inutile pour DualSense BR/EDR et incompatible avec BR_EDR_ONLY.
+CONFIG_BLUEPAD32_ENABLE_BLE_BY_DEFAULT=n
