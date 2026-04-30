@@ -2,6 +2,7 @@ set(SPIDERBOT_COMMON_DIR "${CMAKE_CURRENT_LIST_DIR}/../../common")
 
 set(SPIDERBOT_MAIN_SRCS
     "main.cpp"
+    "display_manager.cpp"
     "robot_controller.cpp"
     "robot_fsm.cpp"
     "tripod_walk_fsm.cpp"

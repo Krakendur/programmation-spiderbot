@@ -2,6 +2,7 @@
 
 #include "bluepad_manager.hpp"
 #include "control_constants.hpp"
+#include "display_manager.hpp"
 #include "input_manager.hpp"
 #include "robot_fsm.hpp"
 #include "servo_controller.hpp"
@@ -14,7 +15,8 @@ namespace spiderbot {
 
 class RobotController {
 public:
-    explicit RobotController(const std::vector<int>& servoPins);
+    explicit RobotController(const std::vector<int>& servoPins,
+                             RobotAppMode appMode = RobotAppMode::Spiderbot);
 
     // Starts the 50 Hz control loop.
     int run();
@@ -34,6 +36,7 @@ private:
     BluePadManager bluepad_;
     RobotFSM robotFsm_;
     TripodWalkFSM tripodWalkFsm_;
+    RobotAppMode appMode_;
 
     long long gamepadLastActiveMs_;
     int iteration_;

@@ -19,20 +19,25 @@ constexpr int kInjectedFaultServoId = -1;
 
 }  // namespace
 
-RobotController::RobotController(const std::vector<int>& servoPins)
+RobotController::RobotController(const std::vector<int>& servoPins,
+                                   RobotAppMode appMode)
         : servoController_(servoPins),
-      inputManager_(),
-      bluepad_(),
-      robotFsm_(),
-      tripodWalkFsm_(),
-            gamepadLastActiveMs_(spiderbot::nowMs()),
-      iteration_(0),
-      safeStopApplied_(false),
-    lastLoggedMode_(RobotMode::Idle),
-      tickCallback_() {
+          inputManager_(),
+          bluepad_(),
+          robotFsm_(),
+          tripodWalkFsm_(),
+          appMode_(appMode),
+          gamepadLastActiveMs_(spiderbot::nowMs()),
+          iteration_(0),
+          safeStopApplied_(false),
+          lastLoggedMode_(RobotMode::Idle),
+          tickCallback_() {
     if (servoPins.size() != ServoController::NUM_SERVOS) {
         throw std::invalid_argument("RobotController requires exactly 18 servo pins");
     }
+    std::cout << "[RobotController] App mode selected: "
+              << (appMode_ == RobotAppMode::Spiderbot ? "Spiderbot" : "Spiderkey")
+              << std::endl;
 }
 
 BluePadManager& RobotController::bluepadManager() {

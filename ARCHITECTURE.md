@@ -20,8 +20,7 @@ esp32/
   components/
   main/
     main.cpp
-    robot_controller.hpp / .cpp
-    robot_fsm.hpp / .cpp
+      display_manager.hpp / .cpp
     tripod_walk_fsm.hpp / .cpp
     leg_fsm.hpp / .cpp
     servo_controller.hpp / .cpp
@@ -42,10 +41,12 @@ common/
 ## Responsabilites ESP32
 
 `RobotController` orchestre la boucle 50 Hz et applique les priorites de securite.
+Au demarrage, `DisplayManager` affiche un menu ILI9488 et selectionne l'application (`Spiderbot` ou `Spiderkey`).
 La chaine de locomotion est:
 
 ```text
-BluePadManager
+DisplayManager (menu ILI9488)
+  -> BluePadManager
   -> InputManager
   -> TripodWalkFSM + LegFSM[6]
   -> LegKinematics
@@ -69,6 +70,8 @@ Le code Raspberry Pi reste limite a l'audio-visuel:
 - `camera_manager`: capture et gestion camera.
 - `audio_manager`: entree micro et sortie audio.
 - `main.cpp`: boucle locale de demonstration.
+
+Le controle de l'écran ILI9488 et du menu de demarrage sont pris en charge par l'ESP32, sans modifier la separation actuelle entre audio-visuel et locomotion.
 
 La Raspberry Pi ne pilote pas les servos dans l'etat actuel du projet.
 
