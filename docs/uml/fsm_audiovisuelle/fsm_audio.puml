@@ -1,0 +1,44 @@
+@startuml
+title Spider-Bot - FSM audio
+
+[*] --> AUDIO_INIT
+
+state AUDIO_INIT
+AUDIO_INIT : Initialisation micros
+AUDIO_INIT : Initialisation sortie audio
+
+state AUDIO_IDLE
+AUDIO_IDLE : Audio prêt
+AUDIO_IDLE : Aucun flux actif
+
+state LISTEN_MODE
+LISTEN_MODE : Capture microphones
+LISTEN_MODE : Transmission audio
+
+state TALK_MODE
+TALK_MODE : Lecture audio
+TALK_MODE : Haut-parleurs actifs
+
+state AUDIO_ERROR
+AUDIO_ERROR : Défaut micro
+AUDIO_ERROR : Défaut sortie audio
+
+AUDIO_INIT --> AUDIO_IDLE : initialisation OK
+AUDIO_INIT --> AUDIO_ERROR : échec initialisation
+
+AUDIO_IDLE --> LISTEN_MODE : démarrage écoute
+AUDIO_IDLE --> TALK_MODE : démarrage diffusion
+AUDIO_IDLE --> [*] : arrêt service audio
+
+LISTEN_MODE --> AUDIO_IDLE : arrêt écoute
+LISTEN_MODE --> AUDIO_ERROR : erreur micro
+LISTEN_MODE --> AUDIO_ERROR : erreur transmission
+
+TALK_MODE --> AUDIO_IDLE : arrêt diffusion
+TALK_MODE --> AUDIO_ERROR : erreur lecture
+TALK_MODE --> AUDIO_ERROR : erreur ampli
+
+AUDIO_ERROR --> AUDIO_INIT : reset audio
+AUDIO_ERROR --> [*] : arrêt service audio
+
+@enduml

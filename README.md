@@ -22,6 +22,28 @@ Ce README a pour objectif :
 
 ---
 
+## Parcours rapide actuel
+
+Pour gagner du temps, le projet se lit dans cet ordre :
+
+1. **Tester la DualSense seule** : profil `esp32dev-bt-test`, déjà validé.
+2. **Tester la DualSense + 6 servos** : même profil `esp32dev-bt-test`, fichier `esp32/main/bt_test_main.c`.
+3. **Tester les PWM sans manette** : profil `esp32dev-hybrid`, entrée manette simulée.
+4. **Revenir au robot complet** : `esp32/main/main.cpp` -> `RobotController` -> FSM/IK/servos.
+
+Le chemin matériel le plus fiable aujourd'hui est donc :
+
+```powershell
+cd esp32
+pio run -e esp32dev-bt-test
+pio run -e esp32dev-bt-test -t upload
+pio device monitor -b 115200
+```
+
+Le profil `esp32dev-ps5-hybrid` reste l'objectif pour le robot complet, mais il dépend d'un header Arduino `Bluepad32.h`. S'il n'est pas disponible, le firmware compile mais retombe en entrée simulée. Pour les tests terrain actuels, utiliser `esp32dev-bt-test`.
+
+---
+
 ## Stack technique
 
 | Élément | Choix retenu | Pourquoi |
@@ -75,6 +97,7 @@ programmation-spiderbot/
 │   ├── components/                 ← Bluepad32 + BTstack (sous-modules)
 │   └── main/
 │       ├── CMakeLists.txt
+│       ├── bt_test_main.c           ← test court DualSense + 6 servos
 │       ├── main.cpp
 │       ├── robot_controller.hpp / .cpp
 │       ├── robot_fsm.hpp / .cpp
@@ -112,7 +135,7 @@ Le point d'entrée ESP32 est `esp32/main/main.cpp`, qui instancie `RobotControll
 La boucle de contrôle réelle se trouve dans `esp32/main/robot_controller.cpp`.
 `bluepad_manager.cpp` fait le pont entre l'API Bluepad32 et `InputManager`.
 
-> Le sous-dossier `main/` est imposé par le template ESP-IDF + Arduino. Tout le code source y vit, et le `CMakeLists.txt` de `main/` liste explicitement les fichiers `.cpp` à compiler.
+> Le sous-dossier `main/` est imposé par ESP-IDF. Tout le code source y vit. Le profil `esp32dev-bt-test` compile seulement `bt_test_main.c`; les autres profils compilent le robot C++ autour de `main.cpp`.
 
 ---
 
@@ -286,32 +309,47 @@ PlatformIO détecte le `platformio.ini` et télécharge la toolchain ESP-IDF (5�
 
 ### Profils de build
 
-Trois environnements sont définis dans `platformio.ini` :
+Les environnements utiles sont définis dans `platformio.ini` :
 
 | Profil | Description | Macros |
 |---|---|---|
 | `esp32dev-sim` | Build de base (simulation, pas de hardware) | aucune |
-| `esp32dev-hybrid` | Sortie PWM LEDC réelle, manette simulée | `SPIDERBOT_USE_LEDC_EXAMPLE` |
-| `esp32dev-ps5-hybrid` | PWM réel + DualSense Bluepad32 | `SPIDERBOT_USE_LEDC_EXAMPLE` + `SPIDERBOT_USE_BLUEPAD32_EXAMPLE` |
+| `esp32dev-bt-test` | DualSense réelle + 6 servos de validation, sans FSM robot | `SPIDERBOT_BT_TEST` via script |
+| `esp32dev-hybrid` | Sortie PWM réelle, manette simulée | `SPIDERBOT_USE_LEDC_EXAMPLE` |
+| `esp32dev-ps5-hybrid` | Cible robot complet DualSense + PWM, encore dépendante de `Bluepad32.h` Arduino | `SPIDERBOT_USE_LEDC_EXAMPLE` + `SPIDERBOT_USE_BLUEPAD32_EXAMPLE` |
 
 ### Commandes principales
 
 Depuis le dossier `esp32/` :
 
 ```powershell
-# Build seul
+# Chemin terrain actuel: manette + 6 servos
+pio run -e esp32dev-bt-test
+pio run -e esp32dev-bt-test -t upload --upload-port COM3
+pio device monitor -b 115200 -p COM3
+
+# Builds robot/simulation
 pio run -e esp32dev-sim
 pio run -e esp32dev-hybrid
 pio run -e esp32dev-ps5-hybrid
-
-# Flash + monitor série (adapter le port)
-pio run -e esp32dev-ps5-hybrid -t upload --upload-port COM3
-pio device monitor -b 115200 -p COM3
 ```
 
 Sous Linux/macOS, le port ressemble à `/dev/ttyUSB0` ou `/dev/cu.usbserial-XXXX`.
 
 ### Logs attendus au démarrage
+
+Avec le chemin terrain actuel `esp32dev-bt-test` :
+
+```text
+[BT] Spider-Bot Bluepad32 + 6 servos test demarre
+[SERVO] 6 servos centres a 90 degres
+[BT] Bluetooth pret
+[BT] DualSense prete!
+[BT] Origine sticks capturee: ...
+[PAD] lx= ...
+```
+
+Avec les profils robot C++ autour de `main.cpp`, le log suivant indique que le backend Arduino Bluepad32 est actif :
 
 Si la manette Bluepad32 est correctement activée :
 ```
@@ -325,13 +363,19 @@ Si tu vois :
 alors :
 - soit le profil de build actif n'inclut pas la macro `SPIDERBOT_USE_BLUEPAD32_EXAMPLE`,
 - soit `Bluepad32.h` n'est pas disponible dans l'environnement de build (vérifier que `components/bluepad32/` est bien initialisé).
+Pour le banc actuel, ce message n'est pas attendu : utilise plutôt `esp32dev-bt-test`.
 
 ### Appairage DualSense
 
 1. Mettre la manette en mode pairing : maintenir **PS + Share** jusqu'à ce que la barre lumineuse clignote rapidement.
-2. Démarrer l'ESP32 avec le firmware `esp32dev-ps5-hybrid` flashé.
+2. Démarrer l'ESP32 avec le firmware `esp32dev-bt-test` flashé.
 3. La manette se connecte automatiquement (LED bleue fixe).
-4. Pour **oublier** un appairage côté ESP32, l'API Bluepad32 expose `BP32.forgetBluetoothKeys()`.
+4. Si l'appairage reste bloqué, effacer la flash puis reflasher :
+
+```powershell
+pio run -e esp32dev-bt-test -t erase
+pio run -e esp32dev-bt-test -t upload
+```
 
 Voir `docs/ps5_controller_and_servo_wiring.md` pour la procédure complète.
 
@@ -367,7 +411,8 @@ Pour assurer la cohérence du projet (et aider GitHub Copilot à générer du co
 - [x] Cinématique inverse + directe (validées numériquement)
 - [x] Squelette des FSMs (Robot, TripodWalk, Leg)
 - [x] Migration vers PlatformIO + template Bluepad32
-- [ ] Validation hybride 6 servos (pattes avant)
+- [x] Appairage DualSense + lecture des axes
+- [ ] Validation DualSense + 6 servos sur banc
 - [ ] Validation 18 servos (robot complet posé)
 - [ ] Premier déplacement tripod gait sur sol plat
 - [ ] Communication ESP32 ↔ Raspberry Pi (UART ou I²C)

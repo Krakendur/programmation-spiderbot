@@ -1,5 +1,15 @@
 # Guide pratique - Manette PS5 et branchement servos ESP32
 
+Chemin de test actuel recommande:
+
+```powershell
+cd esp32
+pio run -e esp32dev-bt-test -t upload
+pio device monitor -b 115200
+```
+
+Ce profil valide la DualSense et les 6 servos de banc dans `esp32/main/bt_test_main.c`.
+
 Date de reference: 2026-04-20
 
 ## 1) Connecter une manette PS5 (DualSense) au Spider-Bot
@@ -8,11 +18,13 @@ But: utiliser la manette reellement, au lieu de la simulation de trames.
 
 ### Etape A - Activer le backend manette cote firmware
 
-- Compiler/flasher la cible ESP32 avec la macro SPIDERBOT_USE_BLUEPAD32_EXAMPLE activee.
+- Compiler/flasher la cible ESP32 `esp32dev-bt-test`.
 - Au boot, verifier le log attendu:
-  - [ESP32] Bluepad32 example backend active
+  - [BT] Spider-Bot Bluepad32 + 6 servos test demarre
+  - [BT] Bluetooth pret
+  - [BT] DualSense prete!
 
-Si le log affiche Bluepad32 backend disabled, le robot est encore en mode simulation d'entree.
+Si le log affiche `Bluepad32 backend disabled`, tu n'es pas sur le profil de test ESP-IDF pur. Revenir au profil `esp32dev-bt-test` pour le banc manette + 6 servos.
 
 ### Etape B - Mettre la DualSense en mode appairage
 
@@ -22,10 +34,11 @@ Si le log affiche Bluepad32 backend disabled, le robot est encore en mode simula
 
 ### Etape C - Verifier les logs de fonctionnement
 
-- [FSM] mode=TELEOP ... frame=yes ...
-- [STATUS] ... bluepad=CONNECTED ...
+- [BT] Origine sticks capturee: ...
+- [PAD] lx= ... ly= ... rx= ... ry= ...
+- [SERVO] 6 servos centres a 90 degres
 
-Si frame=no en continu, la manette n'envoie pas de trame exploitee.
+Si les logs `[PAD]` n'apparaissent pas apres `DualSense prete`, la manette est connectee mais les trames ne remontent pas correctement.
 
 ## 2) Ou brancher les servos sur l'ESP32
 
@@ -53,9 +66,9 @@ Sans GND commun, le signal PWM peut devenir instable.
 
 ## 4) Demarrage recommande (safe)
 
-1. Commencer en mode hybride 6 servos (0,1,2,9,10,11).
+1. Commencer avec `esp32dev-bt-test` sur 6 servos (0,1,2,9,10,11).
 2. Robot sur support, pattes dans le vide.
 3. Verifier recentrage puis commandes legeres.
 4. Etendre ensuite progressivement.
 
-Rappel: le backend hybride utilise `ESP32Servo` via la macro existante `SPIDERBOT_USE_LEDC_EXAMPLE`.
+Rappel: le test actuel utilise directement LEDC dans `bt_test_main.c` pour rester sur le chemin Bluepad32 deja valide. Le backend robot complet via `ESP32Servo` reste pour l'etape suivante.

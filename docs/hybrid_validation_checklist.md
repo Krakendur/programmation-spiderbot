@@ -1,4 +1,6 @@
-# Checklist terrain - Test hybride (6 servos)
+# Checklist terrain - Test DualSense + 6 servos
+
+Profil a flasher pour le banc actuel: `esp32dev-bt-test`.
 
 Usage: version courte pour essai sur banc.
 Reference detaillee: voir le protocole complet.
@@ -23,21 +25,21 @@ Carte ESP32:
 - [ ] Arret alim accessible en 1 geste
 - [ ] Cablage controle sur 6 servos actifs: 0,1,2,9,10,11
 
-## Gate 0 - Sanity desktop
+## Gate 0 - Build
 
-- [ ] Build desktop OK
-- [ ] Run simulation OK
-- [ ] Logs vus: REST, FORWARD, TURN, CENTER, WALK_LIGHT
-- [ ] Logs FSM vus: mode TELEOP, ik=no
+- [ ] `pio run -e esp32dev-bt-test` OK
+- [ ] Pas d'erreur LEDC
+- [ ] Pas d'erreur Bluepad32
 
 Resultat Gate 0: [ ] PASS [ ] FAIL
 
-## Gate 1 - Boot hybride ESP32
+## Gate 1 - Boot ESP32
 
-- [ ] Flash firmware hybride
-- [ ] Boot stable (pas de passage immediat en ERROR)
-- [ ] Log backend hybride visible
+- [ ] Flash firmware `esp32dev-bt-test`
+- [ ] Boot stable
+- [ ] Log `[BT] Spider-Bot Bluepad32 + 6 servos test demarre`
 - [ ] IDs servos de validation affiches (0,1,2,9,10,11)
+- [ ] Log `[SERVO] 6 servos centres a 90 degres`
 
 Resultat Gate 1: [ ] PASS [ ] FAIL
 
@@ -60,36 +62,17 @@ Controles:
 - [ ] Mouvement fluide
 - [ ] Pas d'oscillation anormale
 - [ ] Pas de blocage mecanique
-- [ ] FSM reste en TELEOP avec signal present
+- [ ] Logs `[PAD]` coherents avec les mouvements de la manette
 
 Resultat Gate 2: [ ] PASS [ ] FAIL
 
-## Gate 3A - Perte signal manette
+## Gate 3 - Deconnexion manette
 
 - [ ] Couper manette / flux
-- [ ] Verification timeout ~500 ms
-- [ ] Log safe stop visible
-- [ ] Transition SAFE_STOP visible
+- [ ] Log `[BT] Manette deconnectee`
 - [ ] Recentrage effectif
 
-Resultat Gate 3A: [ ] PASS [ ] FAIL
-
-## Gate 3B - Defaut servo injecte
-
-- [ ] Build avec macro SPIDERBOT_TEST_SERVO_FAULT
-- [ ] Defaut servo detecte
-- [ ] Transition ERROR visible
-- [ ] Arret securise des sorties effectif
-
-Resultat Gate 3B: [ ] PASS [ ] FAIL
-
-## Gate 3C - IK impossible (si prepare)
-
-- [ ] Injection cible IK impossible activee
-- [ ] Transition ERROR visible
-- [ ] Arret securise effectif
-
-Resultat Gate 3C: [ ] PASS [ ] FAIL [ ] N/A
+Resultat Gate 3: [ ] PASS [ ] FAIL
 
 ## Bilan final
 

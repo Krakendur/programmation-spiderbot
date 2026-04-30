@@ -1,0 +1,45 @@
+@startuml
+title Spider-Bot - FSM vidéo
+
+[*] --> CAMERA_INIT
+
+state CAMERA_INIT
+CAMERA_INIT : Ouverture caméra
+CAMERA_INIT : Vérification capteur
+
+state CAMERA_READY
+CAMERA_READY : Caméra prête
+CAMERA_READY : Aucun flux actif
+
+state STREAMING
+STREAMING : Capture vidéo
+STREAMING : Encodage
+STREAMING : Transmission
+
+state STREAM_PAUSED
+STREAM_PAUSED : Flux suspendu
+
+state VIDEO_ERROR
+VIDEO_ERROR : Défaut caméra
+VIDEO_ERROR : Défaut capture
+VIDEO_ERROR : Défaut transmission
+
+CAMERA_INIT --> CAMERA_READY : caméra OK
+CAMERA_INIT --> VIDEO_ERROR : init impossible
+
+CAMERA_READY --> STREAMING : démarrage flux
+CAMERA_READY --> [*] : arrêt service vidéo
+
+STREAMING --> STREAM_PAUSED : pause demandée
+STREAMING --> CAMERA_READY : arrêt flux
+STREAMING --> VIDEO_ERROR : perte caméra
+STREAMING --> VIDEO_ERROR : erreur encodage
+STREAMING --> VIDEO_ERROR : erreur transmission
+
+STREAM_PAUSED --> STREAMING : reprise demandée
+STREAM_PAUSED --> CAMERA_READY : arrêt vidéo
+
+VIDEO_ERROR --> CAMERA_INIT : reset vidéo
+VIDEO_ERROR --> [*] : arrêt service vidéo
+
+@enduml

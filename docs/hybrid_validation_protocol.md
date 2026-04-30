@@ -1,157 +1,78 @@
-# Protocole de test hybride materiel (6 servos)
-
-Date de reference: 2026-04-20
+# Protocole de test DualSense + 6 servos
 
 Checklist courte pour usage banc: `docs/hybrid_validation_checklist.md`
 
 ## Objectif
 
-Valider sur banc la chaine complete ESP32 pour un sous-ensemble de 6 servos:
+Valider rapidement la chaine materielle minimale avant de revenir au robot complet:
 
-- entree manette,
-- FSM globale + locomotion,
-- IK,
-- sortie servo via backend ESP32Servo reel (mode hybride).
+- appairage DualSense via Bluepad32,
+- capture de l'origine des joysticks a la connexion,
+- sortie PWM LEDC directe sur 6 servos,
+- recentrage au demarrage, au bouton `X` et a la deconnexion.
 
-Le test ne couvre pas la partie Raspberry Pi (audio/video).
+Ce test ne couvre pas encore la FSM globale, la locomotion tripode, ni l'IK. Ces couches restent dans le robot C++ autour de `main.cpp`.
 
-## Perimetre de validation
+## Profil a utiliser
 
-Le mode hybride par defaut active uniquement les servos:
-
-- 0: front-left coxa
-- 1: front-left femur
-- 2: front-left tibia
-- 9: front-right coxa
-- 10: front-right femur
-- 11: front-right tibia
-
-Reference code:
-
-- `esp32/main/esp32_runtime_wiring.hpp`: `kDefaultHybridValidationServoIds`
-- `esp32/main/esp32_runtime_wiring.cpp`: mode `Esp32WiringMode::HybridValidation`
-
-## Prerequis
-
-## Prerequis logiciels
-
-- Build desktop passe (sanity check logique).
-- Build ESP32 avec backend ESP32Servo d'exemple active.
-- Optionnel: build ESP32 avec backend Bluepad32 d'exemple active.
-
-## Prerequis banc materiel
-
-- Robot sur support (pattes dans le vide, aucune charge au sol).
-- Alimentation servo stable et protegee.
-- Bouton/commande d'arret alimentation accessible immediatement.
-- Cablage controle pour les 6 servos actifs uniquement pendant ce test.
-
-## Gate 0 - Sanity check desktop
-
-Depuis la racine du repo:
+Depuis `esp32/`:
 
 ```powershell
-New-Item -ItemType Directory -Force build
-g++ -std=c++17 -Wall -Wextra -pedantic .\esp32\main\*.cpp .\common\*.cpp -I.\esp32\main -I.\common -o .\build\spiderbot_esp32_sim_check.exe
-.\build\spiderbot_esp32_sim_check.exe
+pio run -e esp32dev-bt-test
+pio run -e esp32dev-bt-test -t upload
+pio device monitor -b 115200
 ```
 
-Attendus minimum dans les logs:
+Code execute: `esp32/main/bt_test_main.c`.
 
-- `[SIM] phase=REST`, puis `FORWARD`, `TURN`, `CENTER`, `WALK_LIGHT`
-- `[FSM] mode=TELEOP ... ik=no`
-- `[STATUS] loop=... bluepad=CONNECTED mode=TELEOP`
+## Servos actifs
 
-## Gate 1 - Demarrage hybride sur ESP32
+Le banc active uniquement:
 
-1. Flasher le firmware ESP32 configure pour le mode hybride ESP32Servo.
-2. Demarrer sans poser le robot au sol.
-3. Verifier dans les logs:
-   - activation backend ESP32Servo hybride,
-   - affichage des 6 IDs servos de validation,
-   - absence de passage immediat en `ERROR`.
+- 0: front-left coxa, GPIO 13
+- 1: front-left femur, GPIO 14
+- 2: front-left tibia, GPIO 15
+- 9: front-right coxa, GPIO 23
+- 10: front-right femur, GPIO 25
+- 11: front-right tibia, GPIO 26
 
-Critere GO Gate 1:
+Les angles sont limites a `60..120 deg` autour du centre `90 deg`.
 
-- Le systeme reste stable en boucle et publie des logs FSM/STATUS.
-
-## Gate 2 - Sequence fonctionnelle des 6 servos
-
-Executer les commandes manette dans cet ordre pratique:
-
-1. Patte avant gauche: coxa (0), femur (1), tibia (2).
-2. Patte avant droite: coxa (9), femur (10), tibia (11).
-3. Commande avance legere.
-4. Commande rotation legere.
-5. Commande recentrage.
-
-Points de controle:
-
-- Mouvement fluide, sans oscillation anormale.
-- Pas de blocage mecanique ni bruit de butee permanent.
-- FSM reste en `TELEOP` tant que le signal manette est present.
-
-Critere GO Gate 2:
-
-- 6/6 servos de validation repondent correctement aux commandes.
-
-## Gate 3 - Tests securite obligatoires
-
-## 3A - Perte de signal manette
-
-1. Couper la manette ou interrompre volontairement le flux.
-2. Attendre le timeout (500 ms, `kBluepadTimeoutMs`).
-
-Attendus:
-
-- log `Signal lost, applying safe stop`
-- transition FSM vers `SAFE_STOP`
-- recentrage via `centerAll()`
-
-## 3B - Defaut servo injecte
-
-1. Compiler avec macro `SPIDERBOT_TEST_SERVO_FAULT`.
-2. Redemarrer et observer la reaction.
-
-Attendus:
-
-- detection defaut servo
-- passage FSM en `ERROR`
-- arret securise des sorties (`stopAll()`)
-
-## 3C - Cible IK inatteignable
-
-Etat actuel:
-
-- la remontee d'erreur IK vers la FSM globale est implementee,
-- aucun point d'injection direct n'est expose dans le wiring runtime.
-
-Recommandation execution:
-
-- preparer une branche de test qui force une cible impossible dans la chaine IK,
-- verifier ensuite la transition en `ERROR` et l'arret securise.
-
-## Fiche de releve (a remplir pendant test)
+## Logs attendus
 
 ```text
-Date/heure:
-Firmware/commit:
-Carte ESP32:
-Alim servos:
-
-Gate 0 (desktop): PASS/FAIL
-Gate 1 (demarrage hybride): PASS/FAIL
-Gate 2 (6 servos): PASS/FAIL
-Gate 3A (signal loss): PASS/FAIL
-Gate 3B (servo fault): PASS/FAIL
-Gate 3C (IK impossible): PASS/FAIL / N/A
-
-Observations:
-Actions correctives:
+[BT] Spider-Bot Bluepad32 + 6 servos test demarre
+[SERVO] servo 0 GPIO 13 pret (...)
+[SERVO] 6 servos centres a 90 degres
+[BT] Bluetooth pret
+[BT] DualSense prete!
+[BT] Origine sticks capturee: ...
+[PAD] lx= ...
 ```
 
-## Criteres de sortie
+## Commandes de test
 
-- Tous les tests obligatoires Gate 0, Gate 1, Gate 2, Gate 3A, Gate 3B sont PASS.
-- Aucun comportement dangereux observe (runaway, butee continue, reset non controle).
-- Si Gate 3C non execute, garder le statut "pret partiel" et planifier l'injection IK.
+- Stick gauche X: coxa gauche/droite.
+- Stick gauche Y: femur/tibia.
+- Stick droit X: differentiel de yaw entre les deux pattes avant.
+- Stick droit Y: hauteur legere.
+- R2/L2: offset de levee.
+- Bouton `X`: recentrage des 6 servos.
+
+## Criteres GO
+
+- Les 6 servos se centrent au boot.
+- La DualSense se connecte sans crash.
+- Les logs `[PAD]` suivent les joysticks.
+- Les mouvements restent fluides, limites et sans butee.
+- La deconnexion recentre les servos.
+
+## Etape suivante
+
+Une fois ce banc valide, reintegrer la manette reelle dans le chemin robot complet:
+
+```text
+DualSense -> BluePadManager -> InputManager -> FSM/IK -> ServoController
+```
+
+Le profil vise pour cette etape est `esp32dev-ps5-hybrid`, mais il faut d'abord resoudre proprement la disponibilite du backend Arduino `Bluepad32.h` ou porter le pont Bluepad32 ESP-IDF vers le runtime C++.

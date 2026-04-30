@@ -1,29 +1,47 @@
-#include "audio_manager.hpp"
-#include "camera_manager.hpp"
+#include "av_fsm.hpp"
 
-#include <chrono>
+#include <csignal>
 #include <iostream>
 #include <thread>
+#include <chrono>
+
+static std::atomic<bool> g_running{true};
+
+static void on_signal(int) { g_running.store(false); }
 
 int main() {
-    spiderbot::CameraManager camera;
-    spiderbot::AudioManager audio;
+    std::signal(SIGINT,  on_signal);
+    std::signal(SIGTERM, on_signal);
 
-    std::cout << "Spider-Bot Raspberry Pi C++ - Demarrage" << std::endl;
+    std::cout << "Spider-Bot Raspberry Pi - Demarrage audiovisuel\n";
 
-    camera.startCapture();
-    audio.startRecording();
+    spiderbot::AvFsm av;
 
-    while (true) {
-        const auto frame = camera.getFrame();
-        const auto audioChunk = audio.getAudioFrame();
-
-        // TODO: transmission vers ESP32 via UART si necessaire.
-        (void)frame;
-        (void)audioChunk;
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    if (!av.init()) {
+        std::cerr << "Echec initialisation AV\n";
+        return 1;
     }
 
+    // Démarre en mode AV complet (caméra + micro)
+    if (!av.startAV()) {
+        std::cerr << "Echec demarrage AV_MODE\n";
+        return 1;
+    }
+
+    std::cout << "Systeme actif - Ctrl+C pour arreter\n";
+
+    while (g_running.load()) {
+        // La boucle principale reste légère : le travail est dans les threads
+        // des sous-gestionnaires (captureLoop, dispatchLoop).
+        // Ici on pourrait surveiller l'état et déclencher un reset si ERROR_AV.
+        if (av.state() == spiderbot::AvState::ERROR_AV) {
+            std::cerr << "[Main] Erreur AV détectée - tentative de reset\n";
+            av.reset();
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    std::cout << "\nArrêt demandé\n";
+    av.safeStop();
     return 0;
 }

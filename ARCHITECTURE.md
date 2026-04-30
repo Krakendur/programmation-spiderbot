@@ -19,6 +19,7 @@ esp32/
   CMakeLists.txt
   components/
   main/
+    bt_test_main.c               # test court DualSense + 6 servos
     main.cpp
     robot_controller.hpp / .cpp
     robot_fsm.hpp / .cpp
@@ -77,14 +78,22 @@ La Raspberry Pi ne pilote pas les servos dans l'etat actuel du projet.
 Le build PlatformIO se lance depuis `esp32/`:
 
 ```powershell
+pio run -e esp32dev-bt-test
 pio run -e esp32dev-sim
 pio run -e esp32dev-hybrid
 pio run -e esp32dev-ps5-hybrid
 ```
 
+Repere rapide:
+
+- `esp32dev-bt-test`: chemin materiel court actuel, DualSense reelle + 6 servos, sans FSM robot.
+- `esp32dev-sim`: robot C++ sans hardware.
+- `esp32dev-hybrid`: robot C++ + PWM reelles, entree manette simulee.
+- `esp32dev-ps5-hybrid`: cible robot complet DualSense + PWM, encore dependante d'un header Arduino `Bluepad32.h`.
+
 Les fichiers `CMakeLists.txt` et `sdkconfig.defaults` gardent une base compatible
-ESP-IDF + Arduino-core pour le template Bluepad32. Le profil PlatformIO actuel
-reste le chemin le plus direct pour compiler le code du robot.
+ESP-IDF + Arduino-core. Le test Bluepad32 fiable passe par ESP-IDF pur dans
+`bt_test_main.c`; le robot complet C++ reste autour de `main.cpp`.
 
 ## Securites implementees
 

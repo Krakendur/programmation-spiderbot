@@ -1,0 +1,55 @@
+@startuml
+title Spider-Bot - FSM globale audiovisuelle
+
+[*] --> INIT_AV
+
+state INIT_AV
+INIT_AV : Initialisation caméra
+INIT_AV : Initialisation audio
+INIT_AV : Vérification système
+
+state IDLE_AV
+IDLE_AV : Système prêt
+IDLE_AV : Attente de commande
+
+state VIDEO_MODE
+VIDEO_MODE : Caméra active
+VIDEO_MODE : Flux vidéo actif
+
+state AV_MODE
+AV_MODE : Vidéo active
+AV_MODE : Audio actif
+
+state SAFE_STOP_AV
+SAFE_STOP_AV : Arrêt des flux
+SAFE_STOP_AV : Libération des ressources
+
+state ERROR_AV
+ERROR_AV : Défaut audiovisuel
+ERROR_AV : Diagnostic ou reset
+
+INIT_AV --> IDLE_AV : initialisation OK
+INIT_AV --> ERROR_AV : échec initialisation
+
+IDLE_AV --> VIDEO_MODE : démarrage vidéo
+IDLE_AV --> AV_MODE : démarrage audio + vidéo
+IDLE_AV --> SAFE_STOP_AV : arrêt demandé
+
+VIDEO_MODE --> IDLE_AV : arrêt vidéo
+VIDEO_MODE --> AV_MODE : activation audio
+VIDEO_MODE --> SAFE_STOP_AV : arrêt demandé
+VIDEO_MODE --> ERROR_AV : erreur caméra
+VIDEO_MODE --> ERROR_AV : erreur flux
+
+AV_MODE --> VIDEO_MODE : arrêt audio
+AV_MODE --> IDLE_AV : arrêt total
+AV_MODE --> SAFE_STOP_AV : arrêt demandé
+AV_MODE --> ERROR_AV : erreur audio
+AV_MODE --> ERROR_AV : erreur vidéo
+
+SAFE_STOP_AV --> IDLE_AV : arrêt terminé
+SAFE_STOP_AV --> ERROR_AV : arrêt incomplet
+
+ERROR_AV --> INIT_AV : reset logiciel
+ERROR_AV --> [*] : arrêt système
+@enduml
