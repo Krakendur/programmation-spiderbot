@@ -1,5 +1,6 @@
-# Defaults for the ESP32 WROOM-32 / DevKit V1 target.
-# Keep this project on the original ESP32: Bluepad32 + DualSense need Bluetooth Classic.
-CONFIG_IDF_TARGET="esp32"
-CONFIG_IDF_TARGET_ESP32=y
-CONFIG_AUTOSTART_ARDUINO=y
+# Configuration ESP-IDF pour ESP32-C6 (cible definie par PlatformIO via board=esp32-c6-devkitc-1).
+# Ne pas redefinir CONFIG_IDF_TARGET ici: PlatformIO le fixe d'apres le champ board.
+
+# Activer les exceptions C++ (throw/catch dans le code robot)
+CONFIG_COMPILER_CXX_EXCEPTIONS=y
+CONFIG_COMPILER_CXX_EXCEPTIONS_EMG_POOL_SIZE=0

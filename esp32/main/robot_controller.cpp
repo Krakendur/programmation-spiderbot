@@ -1,7 +1,7 @@
 #include "robot_controller.hpp"
 
+#include <cassert>
 #include <iostream>
-#include <stdexcept>
 #include <thread>
 #include <utility>
 
@@ -32,9 +32,7 @@ RobotController::RobotController(const std::vector<int>& servoPins,
           safeStopApplied_(false),
           lastLoggedMode_(RobotMode::Idle),
           tickCallback_() {
-    if (servoPins.size() != ServoController::NUM_SERVOS) {
-        throw std::invalid_argument("RobotController requires exactly 18 servo pins");
-    }
+    assert(servoPins.size() == ServoController::NUM_SERVOS);
     std::cout << "[RobotController] App mode selected: "
               << (appMode_ == RobotAppMode::Spiderbot ? "Spiderbot" : "Spiderkey")
               << std::endl;

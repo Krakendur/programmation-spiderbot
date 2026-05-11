@@ -18,6 +18,6 @@ set(SPIDERBOT_MAIN_SRCS
 idf_component_register(
     SRCS ${SPIDERBOT_MAIN_SRCS}
     INCLUDE_DIRS "." "${SPIDERBOT_COMMON_DIR}"
-    REQUIRES arduino)
+    REQUIRES esp_system)
 
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)
