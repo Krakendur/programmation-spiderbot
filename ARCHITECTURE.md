@@ -24,6 +24,7 @@ esp32/
   main/
     main.cpp                  # app_main() ESP-IDF, appelle display.runMenuLoop()
     display_manager.hpp / .cpp
+    menu_input.hpp / .cpp     # joystick ADC + boutons physiques (navigation menu)
     robot_controller.hpp / .cpp
     robot_fsm.hpp / .cpp
     tripod_walk_fsm.hpp / .cpp
@@ -55,7 +56,8 @@ La chaine de demarrage est:
 ```text
 app_main()
   -> DisplayManager::initialize()   SPI + ILI9488 init (landscape 480x320)
-  -> DisplayManager::runMenuLoop()  boucle clavier UART (fleches + Entree)
+  -> MenuInput::initialize()         ADC oneshot (joystick) + GPIO pull-up (boutons)
+  -> DisplayManager::runMenuLoop()  boucle joystick/boutons + clavier UART
   -> RobotController (mode selectionne)
        -> InputManager
        -> TripodWalkFSM + LegFSM[6]
@@ -70,9 +72,33 @@ app_main()
 - **Couleurs** : RGB565 converties en 18-bit (3 octets) a l'envoi SPI.
 - **Font** : Adafruit 5×7, rendue pixel par pixel, scalable (scale 1/2/3).
 - **Menu** : 2 items (Spiderbot / Spiderkey), fond rouge sur la selection.
-- **Navigation phase 1** : clavier UART — fleche haut/bas (ANSI ESC[A/B), Entree.
+- **Navigation principale** : joystick analogique (axe Y) + deux boutons physiques.
+  En parallele, le clavier UART (fleches ANSI ESC[A/B, Entree, Backspace) permet
+  de naviguer depuis un terminal de debug sans materiel branche.
   Le timeout de 30 s retourne automatiquement sur Spiderbot.
 - **Navigation phase 2** (a venir) : manette DualSense via Bluepad32.
+
+### Pinout - controleur (branche Version-Spidercontroleur-PlatIO)
+
+| Signal            | GPIO | Peripherique       | Remarques                          |
+|-------------------|------|--------------------|------------------------------------|
+| Joystick axe X    |  0   | ADC1_CH0           | axe horizontal (non utilise menu)  |
+| Joystick axe Y    |  1   | ADC1_CH1           | axe vertical : haut/bas menu       |
+| BTN1 - Valider    |  2   | GPIO entree        | pull-up interne, actif bas, 20 ms debounce |
+| BTN2 - Retour     |  3   | GPIO entree        | pull-up interne, actif bas, 20 ms debounce |
+| Ecran MOSI        |  5   | SPI2               | ILI9488                            |
+| Ecran MISO        |  4   | SPI2               | ILI9488                            |
+| Ecran CLK         |  6   | SPI2               | ILI9488                            |
+| Ecran CS          | 19   | SPI2               | ILI9488                            |
+| Ecran DC          | 11   | GPIO sortie        | Data/Command ILI9488               |
+| Ecran RST         | 10   | GPIO sortie        | Reset ILI9488                      |
+| Retro-eclairage   | 3.3V | (fixe)             | BL toujours allume                 |
+
+Le joystick utilise l'**ADC oneshot** (unite ADC1, attenuation 12 dB, 12 bits).
+La normalisation centre la valeur sur 0 avec une plage de −1.0 a +1.0.
+Un seuil de declenchement a ±0.50 et une zone morte a ±0.05 evitent les faux
+evenements. La machine d'etat joystick garantit une seule impulsion par inclinaison
+(retour au centre obligatoire avant nouvel evenement).
 
 Structure visuelle (calquee sur `terminal_menu.c`) :
 
@@ -82,7 +108,7 @@ Structure visuelle (calquee sur `terminal_menu.c`) :
 │  >  Spiderbot                            │  item selectionne (fond rouge, curseur ">")
 │     Spiderkey                            │  item normal (gris)
 ├──────────────────────────────────────────┤
-│  HAUT/BAS : naviguer  ENTREE : confirmer │  footer hints (cyan/gris)
+│  HAUT/BAS : naviguer  BTN1 : confirmer  BTN2 : retour  │  footer hints
 └──────────────────────────────────────────┘
 ```
 

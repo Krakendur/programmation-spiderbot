@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c *)",
+      "Bash(python esp32/tools/convert_logo.py \"esp32/tools/spider-bot-araignée2-02.png\" esp32/main/spider_logo.hpp 56)"
+    ]
+  }
+}

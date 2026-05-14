@@ -1,5 +1,6 @@
 #include "display_manager.hpp"
 #include "esp32_runtime_wiring.hpp"
+#include "menu_input.hpp"
 #include "robot_controller.hpp"
 
 #include <iostream>
@@ -73,7 +74,13 @@ extern "C" void app_main() {
         return;
     }
 
-    spiderbot::RobotAppMode selectedMode = display.runMenuLoop();
+    spiderbot::MenuInput input;
+    if (!input.initialize()) {
+        std::cerr << "[ERROR] Failed to initialize menu input" << std::endl;
+        return;
+    }
+
+    spiderbot::RobotAppMode selectedMode = display.runMenuLoop(input);
 
     spiderbot::RobotController controller(servoPins, selectedMode);
     spiderbot::configureEsp32RuntimeWiring(controller);

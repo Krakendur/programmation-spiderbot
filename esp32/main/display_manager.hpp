@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "driver/spi_master.h"
+#include "menu_input.hpp"
 
 namespace spiderbot {
 
@@ -35,7 +36,8 @@ public:
     ~DisplayManager();
 
     bool initialize();
-    RobotAppMode runMenuLoop();   // boucle bloquante : clavier UART → retourne le mode choisi
+    // Boucle bloquante : joystick+boutons physiques ET clavier UART → mode choisi
+    RobotAppMode runMenuLoop(MenuInput& input);
     void drawMenu(RobotAppMode selectedMode);
     bool handleMenuInput(bool upPressed, bool downPressed, bool selectPressed);
     RobotAppMode getSelectedMode() const;
@@ -64,10 +66,12 @@ private:
     void drawHeader();
     void drawFooter();
     void drawItems();
+    void drawRotatedLogo(int cx, int cy);
 
     int mosiPin_, misoPin_, clkPin_, csPin_, dcPin_, rstPin_;
     spi_device_handle_t spiDev_{nullptr};
     RobotAppMode selectedMode_{RobotAppMode::Spiderbot};
+    uint16_t logoAngleDeg_{0};
     bool initialized_{false};
 };
 

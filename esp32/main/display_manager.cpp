@@ -1,5 +1,7 @@
 #include "display_manager.hpp"
+#include "spider_logo.hpp"
 
+#include <cmath>
 #include <cstring>
 #include <iostream>
 
@@ -7,6 +9,7 @@
 #include "driver/spi_master.h"
 #include "driver/uart.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -20,26 +23,34 @@ static constexpr int kH = 320;
 
 // ── Layout (portrait terminal_menu → landscape écran) ────────────────────────
 //
-//  y=  8  ┌─────────── SPIDER-BOT ──────────────┐  header box
-//  y= 52  └─────────────────────────────────────┘
-//  y= 54  ──────────────── sep ──────────────────
-//  y= 58  │  >  Spiderbot                        │  item 0
-//  y=159  │     Spiderkey                        │  item 1
-//  y=260  ──────────────── sep ──────────────────
-//  y=264  HAUT/BAS : naviguer ...                  footer hints
+//  y=  8  ┌──[logo 56px]── SpiderControleur ────┐  header box (66px)
+//  y= 74  └─────────────────────────────────────┘
+//  y= 76  ──────────────── sep ──────────────────
+//  y= 80  │  >  Spiderbot                        │  item 0 (70px)
+//  y=150  │     Spiderkey                        │  item 1 (70px)
+//  y=220  ──────────────── sep ──────────────────
+//  y=224  HAUT/BAS : naviguer ...                  footer hints
 //  y=312  ┌─────────────────────────────────────┐  bottom border
 //
 static constexpr int kMargin    =  8;
-static constexpr int kBoxHdrH   = 44;   // hauteur du cadre titre
-static constexpr int kSep1Y     = kMargin + kBoxHdrH + 2;   // 54
-static constexpr int kItemsTop  = kSep1Y + 4;               // 58
-static constexpr int kSep2Y     = 260;
-static constexpr int kFooterTop = kSep2Y + 4;               // 264
-static constexpr int kHintLH    = 16;   // espacement lignes footer
+static constexpr int kBoxHdrH   = 66;   // hauteur du cadre titre (logo 56px + marges)
+static constexpr int kSep1Y     = kMargin + kBoxHdrH + 2;   // 76
+static constexpr int kItemsTop  = kSep1Y + 4;               // 80
+static constexpr int kSep2Y     = 220;
 static constexpr int kNumItems  = 2;
-static constexpr int kItemH     = (kSep2Y - kItemsTop) / kNumItems; // 101
+static constexpr int kItemH     = (kSep2Y - kItemsTop) / kNumItems; // 70
 
 static const char* kMenuLabels[kNumItems] = {"Spiderbot", "Spiderkey"};
+
+// ── Position du logo ──────────────────────────────────────────────────────────
+static constexpr int kLogoCx        = kMargin + 5 + kLogoSize / 2;  // 41 px (en-tête)
+static constexpr int kLogoCy        = kMargin + kBoxHdrH / 2;       // 41 px (en-tête)
+static constexpr int kLogoConfirmCx = kW / 2;                       // 240 px (confirmation)
+static constexpr int kLogoConfirmCy = kLogoSize / 2 + kMargin + 4;  // 36 px (confirmation)
+
+// ── Animation : 3° par frame, rafraîchi toutes les 50 ms ─────────────────────
+static constexpr uint32_t kLogoFrameMs  = 50;
+static constexpr int      kLogoStepDeg  = 3;
 
 // ── Timeout menu ──────────────────────────────────────────────────────────────
 static constexpr int kMenuTimeoutMs = 30'000;
@@ -257,7 +268,7 @@ bool DisplayManager::initSpi() {
     bus.mosi_io_num = mosiPin_; bus.miso_io_num = misoPin_;
     bus.sclk_io_num = clkPin_;
     bus.quadwp_io_num = -1;    bus.quadhd_io_num = -1;
-    bus.max_transfer_sz = 64 * 3;
+    bus.max_transfer_sz = kLogoSize * kLogoSize * 3;  // suffisant pour le sprite logo
 
     if (spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO) != ESP_OK) {
         ESP_LOGE(TAG, "SPI bus init failed"); return false;
@@ -296,42 +307,65 @@ bool DisplayManager::initIli9488() {
     return true;
 }
 
+// ── Logo rotatif ──────────────────────────────────────────────────────────────
+void DisplayManager::drawRotatedLogo(int cx, int cy) {
+    constexpr int S    = kLogoSize;
+    constexpr int half = S / 2;
+
+    float rad  = logoAngleDeg_ * (3.14159265f / 180.0f);
+    float cosA = cosf(rad);
+    float sinA = sinf(rad);
+
+    // Buffer statique en DRAM (DMA-safe) : 32×32×3 = 3072 octets
+    static uint8_t buf[S * S * 3];
+    int idx = 0;
+
+    for (int dy = 0; dy < S; dy++) {
+        for (int dx = 0; dx < S; dx++) {
+            // Rotation inverse : pixel destination → pixel source dans le sprite
+            int px = dx - half;
+            int py = dy - half;
+            int sx = static_cast<int>(px * cosA + py * sinA) + half;
+            int sy = static_cast<int>(-px * sinA + py * cosA) + half;
+
+            Color c = kColorBlack;
+            if (sx >= 0 && sx < S && sy >= 0 && sy < S) {
+                Color raw = kSpiderLogoData[sy * S + sx];
+                if (raw != 0xFFFF) c = raw;  // 0xFFFF = transparent → fond noir
+            }
+            uint8_t r, g, b;
+            color18(c, r, g, b);
+            buf[idx++] = r;
+            buf[idx++] = g;
+            buf[idx++] = b;
+        }
+    }
+
+    setWindow(cx - half, cy - half, cx + half - 1, cy + half - 1);
+    sendBuf(buf, sizeof(buf));
+}
+
 // ── Sections du menu (style terminal_menu) ────────────────────────────────────
 
 void DisplayManager::drawHeader() {
-    // Cadre titre (comme la box ──── de terminal_menu)
+    fillRect(kMargin + 1, kMargin + 1, kW - 2 * kMargin - 2, kBoxHdrH - 2, kColorBlack);
     drawRect(kMargin, kMargin, kW - 2 * kMargin, kBoxHdrH, kColorGray);
 
-    const char* title = "SPIDER-BOT";
-    int scale = 2;                               // scale=2 : charH=16px
-    int tx = (kW - textWidth(title, scale)) / 2;
+    drawRotatedLogo(kLogoCx, kLogoCy);
+
+    // Titre à droite du logo, centré dans l'espace restant
+    const char* title = "SpiderControleur";
+    const int   scale = 2;
+    const int   txStart = kLogoCx + kLogoSize / 2 + 10;
+    const int   avail   = kW - kMargin - txStart;
+    int tx = txStart + (avail - textWidth(title, scale)) / 2;
     int ty = kMargin + (kBoxHdrH - 8 * scale) / 2;
     drawText(tx, ty, title, kColorOrange, kColorBlack, scale);
 
-    // Ligne séparatrice (comme la ligne du bas du bloc titre)
     drawHLine(kMargin, kSep1Y, kW - 2 * kMargin, kColorGray);
 }
 
 void DisplayManager::drawFooter() {
-    // Ligne séparatrice supérieure du footer
-    drawHLine(kMargin, kSep2Y, kW - 2 * kMargin, kColorGray);
-
-    // Lignes d'aide (même structure que terminal_menu)
-    struct { const char* label; const char* value; } hints[] = {
-        {"HAUT/BAS  ", ": naviguer  "},
-        {"ENTREE    ", ": confirmer "},
-        {"Timeout   ", ": 30s       "},
-    };
-
-    int ly = kFooterTop + 4;
-    for (auto& h : hints) {
-        int lx = kMargin + 12;
-        drawText(lx, ly, h.label, kColorCyan,  kColorBlack, 1);
-        drawText(lx + textWidth(h.label, 1), ly, h.value, kColorGray, kColorBlack, 1);
-        ly += kHintLH;
-    }
-
-    // Cadre bas
     drawRect(kMargin, kSep2Y, kW - 2 * kMargin, kH - kSep2Y - kMargin, kColorGray);
 }
 
@@ -355,18 +389,51 @@ void DisplayManager::drawItems() {
     }
 }
 
-// ── Boucle menu clavier UART (calquée sur terminal_menu_loop) ─────────────────
-RobotAppMode DisplayManager::runMenuLoop() {
+// ── Boucle menu : joystick + boutons physiques ET clavier UART ────────────────
+RobotAppMode DisplayManager::runMenuLoop(MenuInput& input) {
     if (!uart_is_driver_installed(UART_NUM_0)) {
         uart_driver_install(UART_NUM_0, 256, 0, 0, nullptr, 0);
         uart_set_baudrate(UART_NUM_0, 115200);
         ESP_LOGI(TAG, "UART0 driver installed");
     }
-
-    ESP_LOGI(TAG, "Menu loop - fleches + Entree, Retour pour annuler");
+    ESP_LOGI(TAG, "Menu loop - joystick/boutons + clavier UART");
 
     const TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(kMenuTimeoutMs);
-    bool pendingConfirm = false;  // true = ecran de confirmation affiché, attente 2e action
+    bool pendingConfirm = false;
+    uint32_t lastLogoMs = static_cast<uint32_t>(esp_timer_get_time() / 1000LL);
+
+    // Retour au menu depuis l'écran de confirmation
+    auto goBack = [&]() {
+        pendingConfirm = false;
+        clearScreen();
+        drawHeader(); drawItems(); drawFooter();
+    };
+
+    // Traitement d'un événement de navigation (commun UART et physique)
+    auto dispatch = [&](MenuEvent evt) -> bool {
+        switch (evt) {
+            case MenuEvent::Up:
+                if (!pendingConfirm) handleMenuInput(true, false, false);
+                break;
+            case MenuEvent::Down:
+                if (!pendingConfirm) handleMenuInput(false, true, false);
+                break;
+            case MenuEvent::Select:
+                if (!pendingConfirm) {
+                    drawConfirmationScreen(selectedMode_);
+                    pendingConfirm = true;
+                } else {
+                    return true;  // validation définitive → sortie boucle
+                }
+                break;
+            case MenuEvent::Back:
+                if (pendingConfirm) goBack();
+                break;
+            default:
+                break;
+        }
+        return false;
+    };
 
     while (true) {
         if (xTaskGetTickCount() >= deadline) {
@@ -375,43 +442,44 @@ RobotAppMode DisplayManager::runMenuLoop() {
             return RobotAppMode::Spiderbot;
         }
 
-        uint8_t c = 0;
-        int len = uart_read_bytes(UART_NUM_0, &c, 1, pdMS_TO_TICKS(100));
-        if (len <= 0) continue;
+        // ── Animation logo (menu ET écran de confirmation) ────────────────────
+        {
+            uint32_t nowMs = static_cast<uint32_t>(esp_timer_get_time() / 1000LL);
+            if (nowMs - lastLogoMs >= kLogoFrameMs) {
+                lastLogoMs = nowMs;
+                logoAngleDeg_ = static_cast<uint16_t>((logoAngleDeg_ + kLogoStepDeg) % 360);
+                if (pendingConfirm)
+                    drawRotatedLogo(kLogoConfirmCx, kLogoConfirmCy);
+                else
+                    drawRotatedLogo(kLogoCx, kLogoCy);
+            }
+        }
 
-        if (c == 0x1B) {
-            uint8_t seq[2] = {0, 0};
-            uart_read_bytes(UART_NUM_0, &seq[0], 1, pdMS_TO_TICKS(50));
-            if (seq[0] == '[') {
-                uart_read_bytes(UART_NUM_0, &seq[1], 1, pdMS_TO_TICKS(50));
-                if (!pendingConfirm) {
-                    if      (seq[1] == 'A') handleMenuInput(true,  false, false);
-                    else if (seq[1] == 'B') handleMenuInput(false, true,  false);
+        // ── Source 1 : entrées physiques (joystick + boutons) ─────────────────
+        MenuEvent phys = input.poll();
+        if (phys != MenuEvent::None && dispatch(phys)) return selectedMode_;
+
+        // ── Source 2 : clavier UART (développement / debug) ──────────────────
+        uint8_t c = 0;
+        int len = uart_read_bytes(UART_NUM_0, &c, 1, pdMS_TO_TICKS(10));
+        if (len > 0) {
+            MenuEvent kbd = MenuEvent::None;
+            if (c == 0x1B) {
+                uint8_t seq[2] = {0, 0};
+                uart_read_bytes(UART_NUM_0, &seq[0], 1, pdMS_TO_TICKS(50));
+                if (seq[0] == '[') {
+                    uart_read_bytes(UART_NUM_0, &seq[1], 1, pdMS_TO_TICKS(50));
+                    if      (seq[1] == 'A') kbd = MenuEvent::Up;
+                    else if (seq[1] == 'B') kbd = MenuEvent::Down;
+                } else {
+                    kbd = MenuEvent::Back;  // ESC seul
                 }
-            } else {
-                // ESC seul (sans '[') → retour au menu si confirmation en attente
-                if (pendingConfirm) {
-                    pendingConfirm = false;
-                    clearScreen();
-                    drawHeader(); drawItems(); drawFooter();
-                }
+            } else if (c == '\r' || c == '\n') {
+                kbd = MenuEvent::Select;
+            } else if (c == 0x7F || c == 0x08) {
+                kbd = MenuEvent::Back;
             }
-        } else if (c == '\r' || c == '\n') {
-            if (!pendingConfirm) {
-                // 1er Entrée : affiche la confirmation, attend la 2e action
-                drawConfirmationScreen(selectedMode_);
-                pendingConfirm = true;
-            } else {
-                // 2e Entrée : valide définitivement
-                return selectedMode_;
-            }
-        } else if (c == 0x7F || c == 0x08) {
-            // Backspace / DEL : retour au menu depuis l'écran de confirmation
-            if (pendingConfirm) {
-                pendingConfirm = false;
-                clearScreen();
-                drawHeader(); drawItems(); drawFooter();
-            }
+            if (kbd != MenuEvent::None && dispatch(kbd)) return selectedMode_;
         }
     }
 }
@@ -461,17 +529,22 @@ void DisplayManager::drawConfirmationScreen(RobotAppMode mode) {
     clearScreen();
     drawRect(kMargin, kMargin, kW - 2 * kMargin, kH - 2 * kMargin, kColorGray);
 
-    const char* title = "SELECTION";
-    drawText((kW - textWidth(title, 2)) / 2, 60, title, kColorOrange, kColorBlack, 2);
-    drawHLine(kMargin, 84, kW - 2 * kMargin, kColorGray);
+    // Logo centré en haut de l'écran
+    drawRotatedLogo(kLogoConfirmCx, kLogoConfirmCy);
 
+    // Séparateur sous le logo
+    const int sepY = kLogoConfirmCy + kLogoSize / 2 + 8;
+    drawHLine(kMargin, sepY, kW - 2 * kMargin, kColorGray);
+
+    // Nom du mode sélectionné (grand, centré)
     const char* name = (mode == RobotAppMode::Spiderbot) ? "Spiderbot" : "Spiderkey";
-    drawText((kW - textWidth(name, 3)) / 2, 130, name, kColorWhite, kColorBlack, 3);
+    drawText((kW - textWidth(name, 3)) / 2, sepY + 20, name, kColorWhite, kColorBlack, 3);
 
+    // Hints confirmer / annuler
     const char* confirm = "ENTREE : confirmer";
     const char* cancel  = "RETOUR : annuler";
-    drawText((kW - textWidth(confirm, 1)) / 2, 210, confirm, kColorGreen,  kColorBlack, 1);
-    drawText((kW - textWidth(cancel,  1)) / 2, 228, cancel,  kColorOrange, kColorBlack, 1);
+    drawText((kW - textWidth(confirm, 1)) / 2, 230, confirm, kColorGreen,  kColorBlack, 1);
+    drawText((kW - textWidth(cancel,  1)) / 2, 248, cancel,  kColorOrange, kColorBlack, 1);
 }
 
 void DisplayManager::shutdown() {

@@ -3,6 +3,7 @@ set(SPIDERBOT_COMMON_DIR "${CMAKE_CURRENT_LIST_DIR}/../../common")
 set(SPIDERBOT_MAIN_SRCS
     "main.cpp"
     "display_manager.cpp"
+    "menu_input.cpp"
     "robot_controller.cpp"
     "robot_fsm.cpp"
     "tripod_walk_fsm.cpp"
@@ -18,6 +19,6 @@ set(SPIDERBOT_MAIN_SRCS
 idf_component_register(
     SRCS ${SPIDERBOT_MAIN_SRCS}
     INCLUDE_DIRS "." "${SPIDERBOT_COMMON_DIR}"
-    REQUIRES esp_system)
+    REQUIRES esp_system esp_adc esp_timer driver)
 
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)
