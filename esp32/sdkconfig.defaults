@@ -14,3 +14,7 @@ CONFIG_BTDM_CTRL_MODE_BR_EDR_ONLY=y
 CONFIG_BLUEPAD32_PLATFORM_CUSTOM=y
 # BLE desactive: inutile pour DualSense BR/EDR et incompatible avec BR_EDR_ONLY.
 CONFIG_BLUEPAD32_ENABLE_BLE_BY_DEFAULT=n
+
+# Exceptions C++ requises par le code robot (RobotController, LegKinematics...).
+CONFIG_COMPILER_CXX_EXCEPTIONS=y
+CONFIG_COMPILER_CXX_EXCEPTIONS_EMG_POOL_SIZE=0

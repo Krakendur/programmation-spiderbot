@@ -31,7 +31,13 @@ RobotController::RobotController(const std::vector<int>& servoPins)
     lastLoggedMode_(RobotMode::Idle),
       tickCallback_() {
     if (servoPins.size() != ServoController::NUM_SERVOS) {
+#ifdef __cpp_exceptions
         throw std::invalid_argument("RobotController requires exactly 18 servo pins");
+#else
+        printf("[ERROR] RobotController: %zu pins fournis, %d attendus\n",
+               servoPins.size(), ServoController::NUM_SERVOS);
+        abort();
+#endif
     }
 }
 
