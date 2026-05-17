@@ -53,7 +53,6 @@ static constexpr uint32_t kLogoFrameMs  = 50;
 static constexpr int      kLogoStepDeg  = 3;
 
 // ── Timeout menu ──────────────────────────────────────────────────────────────
-static constexpr int kMenuTimeoutMs = 30'000;
 
 // ── Font Adafruit 5×7, ASCII 0x20–0x7E ────────────────────────────────────────
 static const uint8_t kFont[][5] = {
@@ -398,7 +397,6 @@ RobotAppMode DisplayManager::runMenuLoop(MenuInput& input) {
     }
     ESP_LOGI(TAG, "Menu loop - joystick/boutons + clavier UART");
 
-    const TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(kMenuTimeoutMs);
     bool pendingConfirm = false;
     uint32_t lastLogoMs = static_cast<uint32_t>(esp_timer_get_time() / 1000LL);
 
@@ -436,12 +434,6 @@ RobotAppMode DisplayManager::runMenuLoop(MenuInput& input) {
     };
 
     while (true) {
-        if (xTaskGetTickCount() >= deadline) {
-            ESP_LOGI(TAG, "Timeout - defaut Spiderbot");
-            drawConfirmationScreen(RobotAppMode::Spiderbot);
-            return RobotAppMode::Spiderbot;
-        }
-
         // ── Animation logo (menu ET écran de confirmation) ────────────────────
         {
             uint32_t nowMs = static_cast<uint32_t>(esp_timer_get_time() / 1000LL);

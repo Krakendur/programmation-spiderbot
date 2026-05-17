@@ -9,8 +9,8 @@ namespace spiderbot {
 
 static const char* TAG = "MenuInput";
 
-static constexpr float    kDeadzone     = 0.05f;  // ±5 %
-static constexpr float    kJoyThresh    = 0.50f;  // seuil de déclenchement direction
+static constexpr float    kDeadzone     = 0.15f;  // ±15 % zone morte (hysteresis retour)
+static constexpr float    kJoyThresh    = 0.75f;  // seuil de déclenchement direction (75%)
 static constexpr uint32_t kDebouncMs   = 20;      // debounce boutons
 static constexpr int      kAdcCenter   = 2048;    // mi-course 12-bit
 static constexpr int      kAdcMax      = 2048;    // demi-plage pour normalisation
@@ -66,18 +66,18 @@ float MenuInput::readNorm(adc_channel_t ch) {
 
 // ── Joystick : une seule impulsion par inclinaison (state-machine) ─────────────
 MenuEvent MenuInput::pollJoystick() {
-    float ny = readNorm(kChY);  // axe vertical
+    float ny = readNorm(kChX);  // axe horizontal
 
     switch (joyState_) {
         case JoyState::Center:
-            if (ny >  kJoyThresh) { joyState_ = JoyState::UpHeld;   return MenuEvent::Up; }
-            if (ny < -kJoyThresh) { joyState_ = JoyState::DownHeld; return MenuEvent::Down; }
+            if (ny < -kJoyThresh) { joyState_ = JoyState::UpHeld;   return MenuEvent::Up; }
+            if (ny >  kJoyThresh) { joyState_ = JoyState::DownHeld; return MenuEvent::Down; }
             break;
         case JoyState::UpHeld:
-            if (ny < kDeadzone)  joyState_ = JoyState::Center;
+            if (ny > -kDeadzone) joyState_ = JoyState::Center;
             break;
         case JoyState::DownHeld:
-            if (ny > -kDeadzone) joyState_ = JoyState::Center;
+            if (ny < kDeadzone)  joyState_ = JoyState::Center;
             break;
     }
     return MenuEvent::None;
