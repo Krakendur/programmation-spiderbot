@@ -20,13 +20,15 @@ constexpr int kInjectedFaultServoId = -1;
 }  // namespace
 
 RobotController::RobotController(const std::vector<int>& servoPins,
-                                   RobotAppMode appMode)
+                                   RobotAppMode appMode,
+                                   MenuInput* menuInput)
         : servoController_(servoPins),
           inputManager_(),
           bluepad_(),
           robotFsm_(),
           tripodWalkFsm_(),
           appMode_(appMode),
+          menuInput_(menuInput),
           gamepadLastActiveMs_(spiderbot::nowMs()),
           iteration_(0),
           safeStopApplied_(false),
@@ -36,6 +38,19 @@ RobotController::RobotController(const std::vector<int>& servoPins,
     std::cout << "[RobotController] App mode selected: "
               << (appMode_ == RobotAppMode::Spiderbot ? "Spiderbot" : "Spiderkey")
               << std::endl;
+}
+
+GamepadData RobotController::buildJoystickFrame() {
+    GamepadData frame;
+    frame.axes["lx"] = static_cast<double>(menuInput_->readAxisX());
+    frame.axes["ly"] = static_cast<double>(menuInput_->readAxisY());
+    frame.axes["rx"] = 0.0;
+    frame.axes["ry"] = 0.0;
+    frame.axes["lt"] = 0.0;
+    frame.axes["rt"] = 0.0;
+    frame.buttons["X"] = menuInput_->readBtnSelect();
+    frame.buttons["B"] = menuInput_->readBtnBack();
+    return frame;
 }
 
 BluePadManager& RobotController::bluepadManager() {
@@ -80,7 +95,13 @@ int RobotController::run() {
             tickCallback_();
         }
 
-        const auto gamepadData = bluepad_.update();
+        std::optional<GamepadData> gamepadData;
+        if (appMode_ == RobotAppMode::Spiderkey && menuInput_) {
+            gamepadData = buildJoystickFrame();
+        } else {
+            gamepadData = bluepad_.update();
+        }
+
         const bool frameReceived = gamepadData.has_value();
         if (frameReceived) {
             gamepadLastActiveMs_ = currentTime;
@@ -89,9 +110,13 @@ int RobotController::run() {
             safeStopApplied_ = false;
         }
 
-        const bool gamepadSeen = inputManager_.isGamepadConnected();
-        const bool signalLost =
-            gamepadSeen && (currentTime - gamepadLastActiveMs_ > kBluepadTimeoutMs);
+        // En mode Spiderkey, le joystick est toujours présent → pas de timeout.
+        const bool gamepadSeen = (appMode_ == RobotAppMode::Spiderkey && menuInput_)
+                                     ? true
+                                     : inputManager_.isGamepadConnected();
+        const bool signalLost = (appMode_ == RobotAppMode::Spiderkey && menuInput_)
+                                    ? false
+                                    : (gamepadSeen && (currentTime - gamepadLastActiveMs_ > kBluepadTimeoutMs));
 
         RobotFsmInput fsmInput{};
         fsmInput.gamepadFrameReceived = frameReceived;
@@ -144,9 +169,14 @@ int RobotController::run() {
         }
 
         if (iteration_ % 100 == 0) {
-            std::cout << "[STATUS] loop=" << iteration_ << " bluepad="
-                      << (bluepad_.isConnected() ? "CONNECTED" : "DISCONNECTED")
-                      << " mode=" << modeToString(currentMode) << std::endl;
+            if (appMode_ == RobotAppMode::Spiderkey && menuInput_) {
+                std::cout << "[STATUS] loop=" << iteration_ << " joystick=CONNECTED"
+                          << " mode=" << modeToString(currentMode) << std::endl;
+            } else {
+                std::cout << "[STATUS] loop=" << iteration_ << " bluepad="
+                          << (bluepad_.isConnected() ? "CONNECTED" : "DISCONNECTED")
+                          << " mode=" << modeToString(currentMode) << std::endl;
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(20));

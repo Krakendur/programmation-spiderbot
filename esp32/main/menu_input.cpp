@@ -100,6 +100,27 @@ MenuEvent MenuInput::pollBtn(gpio_num_t pin, bool& pressed,
     return MenuEvent::None;
 }
 
+// ── Lecture analogique directe (mode Spiderkey) ───────────────────────────────
+float MenuInput::readAxisX() {
+    if (!initialized_) return 0.0f;
+    return readNorm(kChX);
+}
+
+float MenuInput::readAxisY() {
+    if (!initialized_) return 0.0f;
+    return readNorm(kChY);
+}
+
+bool MenuInput::readBtnSelect() {
+    if (!initialized_) return false;
+    return gpio_get_level(kBtnSelect) == 0;
+}
+
+bool MenuInput::readBtnBack() {
+    if (!initialized_) return false;
+    return gpio_get_level(kBtnBack) == 0;
+}
+
 // ── Point d'entrée public ─────────────────────────────────────────────────────
 MenuEvent MenuInput::poll() {
     if (!initialized_) return MenuEvent::None;

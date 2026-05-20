@@ -4,6 +4,7 @@
 #include "control_constants.hpp"
 #include "display_manager.hpp"
 #include "input_manager.hpp"
+#include "menu_input.hpp"
 #include "robot_fsm.hpp"
 #include "servo_controller.hpp"
 #include "tripod_walk_fsm.hpp"
@@ -16,7 +17,8 @@ namespace spiderbot {
 class RobotController {
 public:
     explicit RobotController(const std::vector<int>& servoPins,
-                             RobotAppMode appMode = RobotAppMode::Spiderbot);
+                             RobotAppMode appMode = RobotAppMode::Spiderbot,
+                             MenuInput* menuInput = nullptr);
 
     // Starts the 50 Hz control loop.
     int run();
@@ -31,12 +33,16 @@ public:
 private:
     static const char* modeToString(RobotMode mode);
 
+    // Construit un GamepadData depuis le joystick physique (mode Spiderkey).
+    GamepadData buildJoystickFrame();
+
     ServoController servoController_;
     InputManager inputManager_;
     BluePadManager bluepad_;
     RobotFSM robotFsm_;
     TripodWalkFSM tripodWalkFsm_;
     RobotAppMode appMode_;
+    MenuInput* menuInput_;
 
     long long gamepadLastActiveMs_;
     int iteration_;

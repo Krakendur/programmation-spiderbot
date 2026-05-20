@@ -20,6 +20,12 @@ public:
     bool initialize();
     MenuEvent poll();  // non-bloquant, priorité : boutons > joystick
 
+    // Lecture analogique directe pour le pilotage des servos en mode Spiderkey.
+    float readAxisX();      // joystick horizontal [-1..1] (GPIO0)
+    float readAxisY();      // joystick vertical   [-1..1] (GPIO1)
+    bool  readBtnSelect();  // true si SELECT (GPIO2) pressé
+    bool  readBtnBack();    // true si BACK   (GPIO3) pressé
+
 private:
     enum class JoyState { Center, UpHeld, DownHeld };
 

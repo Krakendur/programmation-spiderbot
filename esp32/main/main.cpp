@@ -82,7 +82,7 @@ extern "C" void app_main() {
 
     spiderbot::RobotAppMode selectedMode = display.runMenuLoop(input);
 
-    spiderbot::RobotController controller(servoPins, selectedMode);
+    spiderbot::RobotController controller(servoPins, selectedMode, &input);
     spiderbot::configureEsp32RuntimeWiring(controller);
     controller.run();
 }
