@@ -539,6 +539,29 @@ void DisplayManager::drawConfirmationScreen(RobotAppMode mode) {
     drawText((kW - textWidth(cancel,  1)) / 2, 248, cancel,  kColorOrange, kColorBlack, 1);
 }
 
+void DisplayManager::showBleStatus(const char* status) {
+    if (!initialized_) return;
+    clearScreen();
+    drawRect(kMargin, kMargin, kW - 2 * kMargin, kH - 2 * kMargin, kColorGray);
+
+    drawRotatedLogo(kLogoConfirmCx, kLogoConfirmCy);
+
+    const int sepY = kLogoConfirmCy + kLogoSize / 2 + 8;
+    drawHLine(kMargin, sepY, kW - 2 * kMargin, kColorGray);
+
+    drawText((kW - textWidth("Spiderbot", 3)) / 2, sepY + 20,
+             "Spiderbot", kColorWhite, kColorBlack, 3);
+
+    drawText((kW - textWidth(status, 2)) / 2, sepY + 80,
+             status, kColorCyan, kColorBlack, 2);
+}
+
+void DisplayManager::tickBleLogo() {
+    if (!initialized_) return;
+    logoAngleDeg_ = static_cast<uint16_t>((logoAngleDeg_ + kLogoStepDeg) % 360);
+    drawRotatedLogo(kLogoConfirmCx, kLogoConfirmCy);
+}
+
 void DisplayManager::shutdown() {
     if (!initialized_) return;
     clearScreen();

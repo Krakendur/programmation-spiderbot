@@ -42,6 +42,8 @@ public:
     bool handleMenuInput(bool upPressed, bool downPressed, bool selectPressed);
     RobotAppMode getSelectedMode() const;
     void drawConfirmationScreen(RobotAppMode mode);
+    void showBleStatus(const char* status);  // BLE status screen (call on state change)
+    void tickBleLogo();                      // advance logo animation + redraw (call at 20 Hz)
     void shutdown();
 
 private:
